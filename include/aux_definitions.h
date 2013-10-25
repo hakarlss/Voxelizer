@@ -171,6 +171,7 @@ struct is_BB
  *****************************************************************************/
 class Exception : public std::exception {
 public:
+    ~Exception() throw() {}
     /** \brief Constructor for strings.
         
         \param[in] message Error message. */
