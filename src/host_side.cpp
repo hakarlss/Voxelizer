@@ -3466,6 +3466,22 @@ auto vox::Voxelizer<Node>::collectData
     return result;
 }
 
+/**************************************************************************//**
+ * Sets the simulateMultiDevice variable to \p true before calling the provided 
+ * function and returning its result. This function is really only intended to 
+ * be used for testing purposes. The simplest way to use it is to give it a 
+ * lambda function, like so:
+ *
+ * \code
+ * vox::Voxelizer voxelizer( ... );
+ * auto result = simulateMultiDevice(
+ *     [&] () { return voxelizer.voxelizeToNodes( ... ); } );
+ * \endcode
+ *
+ * The function that is called needs to return a vector of \p NodePointer, so 
+ * it needs to be called with a function that returns device pointers. The 
+ * results in the vector will be host pointers, however.
+ *****************************************************************************/
 template <class Node>
 auto vox::Voxelizer<Node>::simulateMultidevice
     ( 

@@ -538,7 +538,6 @@
 
 #include "node_types.h"
 #include "aux_definitions.h"
-#include "VoxMemoryManager.h"
 
 #include "helper_math.h"
 
