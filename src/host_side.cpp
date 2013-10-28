@@ -9,6 +9,8 @@
 #include <boost/thread.hpp>
 #include <boost/bind.hpp>
 
+#include <iterator>
+
 /**************************************************************************//**
  * Constructs the voxelizer with the minimum amount of required data.
  * Does not use the given arrays beyond this contructor: Copies are made
@@ -24,7 +26,7 @@ template <class Node> vox::Voxelizer<Node>::Voxelizer(
     float const * _vertices, 
     uint  const * _indices, 
     uint		  _nrOfVertices, 
-    uint		  _nrOfTriangles )
+    uint		  _nrOfTriangles ): defaultDevice(0)
 {
     this->hostVars.nrOfVertices = _nrOfVertices;
     this->hostVars.nrOfTriangles = _nrOfTriangles;
@@ -69,7 +71,7 @@ template <class Node> vox::Voxelizer<Node>::Voxelizer(
     uchar const * _materials, 
     uint		 _nrOfVertices, 
     uint		 _nrOfTriangles, 
-    uint		 _nrOfUniqueMaterials )
+    uint		 _nrOfUniqueMaterials ): defaultDevice(0)
 {
     Voxelizer( _vertices, _indices, _nrOfVertices, _nrOfTriangles );
 
@@ -85,8 +87,6 @@ template <class Node>
 void vox::Voxelizer<Node>::initVariables()
 {
     this->fatalError = false;
-    
-    this->defaultDevice = 0;
 
     cudaGetDeviceCount( &this->nrOfDevices );
 

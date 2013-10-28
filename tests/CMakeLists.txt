@@ -17,8 +17,8 @@ include_directories( ${VTK_INCLUDE_DIRS} )
 # Configuration-dependent settings. Need to make sure the debug postifix works 
 # when Debug is specified through CMAKE_BUILD_TYPE.
 set( CMAKE_DEBUG_POSTFIX "_d" )
-set( CMAKE_CXX_FLAGS_RELEASE "-W3 -O2 -MD" )
-set( CMAKE_CXX_FLAGS_DEBUG "-W3 -Od -MD" ) 
+set( CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -W3 -O2" )
+set( CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -W3 -Od" )
 
 # Include files from the subdirectories and process the CMakeLists.txt in those 
 # directories.

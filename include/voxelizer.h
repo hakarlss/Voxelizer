@@ -541,13 +541,8 @@
 
 #include "helper_math.h"
 
-#include <math.h>
-
 #include <iostream>
 #include <ctime>
-#include <iterator>
-#include <map>
-#include <set>
 #include <fstream>
 #include <vector>
 #include <memory>
@@ -584,6 +579,7 @@ struct NodePointer {
     uint3 dim;          ///< Dimensions of the \p Node grid.
     uint3 loc;          ///< Location of the \p Node grid.
 
+    /// Default constructor.
     NodePointer(): ptr(NULL), dev(0), dim(make_uint3(0)), loc(make_uint3(0)) 
     {};
 };
@@ -596,11 +592,12 @@ struct NodePointer {
  * information associated with the triangles in the model.
  * The supported \p Node types can be found in node_types.h. If performing a 
  * plain voxelization only, then the type of \p Node chosen does not matter.
- * The only way to affect the density of the voxels and thus the number of 
- * them, is to supply how many voxels can fit the longest length of the 
- * model's bounding box, starting from one edge and ending at the other.
- * The number of voxels along the other dimensions is then automatically 
- * determined, as is the distance between two voxel centers.
+ * Every voxelizing function has two versions that differ in the way the 
+ * density of the voxelization is defined. The first way to define the density 
+ * is to supply a number of voxels that the longest side of the models 
+ * bounding box should have, starting and ending at the edges. The other way 
+ * is to define a distance between voxels along one of the main axes. The 
+ * number of voxels along each dimension is then automatically determined.
  *
  * \tparam Node Type of \p Node to be used in the result. Applies to all 
  *              functions that return \p Nodes.
@@ -611,7 +608,7 @@ class Voxelizer
 private:
     HostContext hostVars;  ///< Host variables.
 
-    int defaultDevice;             ///< Default device id. Should be 0.
+    const int defaultDevice;       ///< Default device id. Should be 0.
     /// Device-specific vars.
     std::vector<std::unique_ptr<DevContext<Node>>> devices;
     int nrOfDevices;               ///< Number of devices on the system.
