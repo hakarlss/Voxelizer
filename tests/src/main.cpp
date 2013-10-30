@@ -1816,22 +1816,6 @@ void performAllSliceTest
         matSplitRes.y = newMatSplitRes.at(1);
     }
 
-    /* Battleplan:
-     * 
-     * 1. Find out the size of the completed Node array.
-     * 2. Repeatedly call voxelizeSliceToRAM, after which:
-     * 3. Apply the Nodes to the completed Node array.
-     * 4. Render the results.
-     *
-     * Regarding 1: There should already exist an implementation for this on 
-     *   the voxelizer side, but it lacks the equivalent functionality for 
-     *   voxelizations defined by distance. Fix that. Also, some minor mod-
-     *   ifications need to be made to support FCC grids.
-     *
-     * Regarding 3: A complete implementation should exist - only the FCC
-     *   version is missing. Implement that.
-    */
-
     vox::NodePointer<Node> result;
     const auto direction = vm[ "allSlice" ].as<int>();
     Node * nodes = nullptr;

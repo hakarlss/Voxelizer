@@ -30,7 +30,7 @@
   *
   * The output of most functions is a grid of \p Nodes, where each \p Node 
   * represents a single voxel along with whatever additional information the 
-  * particular \p Node type happens to contain. Of particular interset to 
+  * particular \p Node type happens to contain. Of particular interest to 
   * acoustics applications is the <em>boundary id</em> that can be found in all 
   * \p Node types. It encodes both the \a solid / \a non-solid status of the 
   * \p Node, as well as the neighborhood configuration, i.e. which neighbors 
@@ -87,12 +87,12 @@
   * successful use of the program, and will introduce its features and how to 
   * use them.
   * 
-  * The entry point to the voxelizer is the \p Voxelizer class, found in file 
-  * voxelizer.h. It defines public member functions that entirely define the 
-  * public interface of this library. It has to be instantiated before use, 
-  * and if one plans to use any \p Node type other the plain voxelization or 
-  * the \p ShortNode type, then the wanted \p Node type should be provided as a 
-  * template parameter, like so:
+  * The entry point to the voxelizer is the \p Voxelizer class, defined in the 
+  * vox namespace and found in the file voxelizer.h. It defines public member 
+  * functions that entirely define the public interface of this library. It 
+  * has to be instantiated before use, and if one plans to use any \p Node type 
+  * other the plain voxelization or the \p ShortNode type, then the wanted \p 
+  * Node type should be provided as a template parameter, like so:
   *
   * \code
   * float * vertices = NULL;
@@ -105,10 +105,10 @@
   *          , &nrOfVertices
   *          , &nrOfIndices );
   * 
-  * Voxelizer<LongNode> voxelizer( vertices
-  *                              , indices
-  *                              , nrOfVertices
-  *                              , nrOfTriangles );
+  * vox::Voxelizer<vox::LongNode> voxelizer( vertices
+  *                                        , indices
+  *                                        , nrOfVertices
+  *                                        , nrOfTriangles );
   * \endcode
   *
   * A loadModel() function is not provided by the library -- it was only used 
@@ -135,6 +135,9 @@
   * \p Voxelizer::setMaterials() and \p Voxelizer::setMaterialOutput(). The 
   * former uploads the material data and the latter enables or disables the 
   * material calculations.
+  *
+  * The model and material data is copied upon construction of the voxelizer, 
+  * so it can be safely deleted after the class has been initialized.
   *
   * The results of the voxelization are given in a \p NodePointer struct. It 
   * contains a pointer to the \p Node or voxel data and how to interpret the 
@@ -168,7 +171,9 @@
   * of the input model's bounding box. The number of voxels along the other 
   * sides are then calculated from that. The voxels are distributed so that 
   * the very ends of the longest side have one voxel each, and then the rest 
-  * are distributed evenly in between.
+  * are distributed evenly in between. Each function also has the option to 
+  * directly specify the distance between voxel centers along any of the main 
+  * axes.
   *
   * The device configuration is given with at most two values: The number of 
   * splits along the y- and z-axes. The idea is to divide the voxelization 
@@ -193,14 +198,19 @@
   * \p matSplitRes. The x-size of \p voxSplitRes should not make much of a 
   * difference on performance, so keeping it at 1024 is a safe choice.
   *
-  * There are currently three kinds of \p Nodes available: \p ShortNode, \p 
-  * LongNode and \p PartialNode. \p ShortNode stores its boundary and material 
-  * information in a single \p char, restricting the number of different 
-  * materials to 8. \p LongNode allocates two \p char values for its data, 
-  * increasing the number of available materials to 256. \p PartialNode is 
-  * a \p LongNode with an additional float value, called the \a ratio, that 
-  * stores information about how large a fraction of the volume of the voxel 
-  * is \a solid.
+  * There are currently five kinds of \p Nodes available: \p ShortNode, \p 
+  * LongNode, \p PartialNode, \p ShortFCCNode and \p LongFCCNode. \p ShortNode 
+  * stores its boundary and material information in a single \p char, 
+  * restricting the number of different materials to 8. \p LongNode allocates 
+  * two \p char values for its data, increasing the number of available 
+  * materials to 256. \p PartialNode is a \p LongNode with an additional float 
+  * value, called the \a ratio, that stores information about how large a 
+  * fraction of the volume of the voxel is \a solid. The \p Short- and \p 
+  * LongFCCNodes mirror their counterparts in the sense that the short version 
+  * is a more compact and restricted version of the long version. The \p FCC 
+  * \p Nodes voxelize on a different kind of lattice than the other \p Node 
+  * types do. This lattice is called a \a Face \a Centered \a Cubice \a lattice
+  * and more information about it can be found in node_types.h.
   *
   * \p Voxelizer::voxelize() and \p Voxelizer::voxelizeToRAM() both produce a 
   * plain voxelization, and is the fastest voxelization to calculate. The 
@@ -250,10 +260,11 @@
   * One of the more confusing things is the division of the voxelization space 
   * into smaller spaces, both with and without multiple devices enabled. Before 
   * any divisions, there is the \a proper voxelization space, the dimensions of 
-  * which are usually kept in \p VoxHostContext.resolution. This space can be 
+  * which are usually kept in \p HostContext.resolution. This space can be 
   * divided into one or more smaller spaces, depending on how many graphics 
   * cards are used. These spaces could be called \a device spaces, and their 
-  * dimensions are kept in the appropriate \p VoxDevContext.resolution. 
+  * dimensions are kept in the appropriate \p DevContext.resolution, there 
+  * being as many DevContext objects as there are graphics cards in use.
   * Finally, each of the device spaces can be further divided into multiple \a 
   * subspaces, to meet the restrictions on the size of the space that is 
   * voxelized at once, as given by \p voxSplitRes and \p matSplitRes when 
@@ -266,15 +277,16 @@
   * device space is divided into subspaces, as each subspace has access to the 
   * whole device space. When the proper space is divided into multiple device 
   * spaces, however, there is a problem accessing neighboring nodes along the 
-  * seams of the splits, since the device spaces reside on separate devices.
+  * seams of the splits, since the desired nodes reside on separate devices.
   * In order to gain access to \p Nodes across devices, the device spaces are 
   * extended along certain directions to make adjacent device spaces overlap 
   * each other by one voxel. Special \p bool values are used to determine which 
   * directions need overlap: \a Left, \a right, \a up and \a down. The 
-  * directions refer to the yz-plane, where left and right are the negative and 
-  * positive directions, respectively, along the y-axis. Since the x-axis is 
-  * never divided across devices, there is no need to consider it.
-  * 
+  * directions refer to directions on the yz-plane, where left and right are 
+  * the negative and positive directions, respectively, along the y-axis. Since 
+  * the x-axis is never divided across devices, there is no need to consider 
+  * it.
+  *
   * Something that ties into the concept of overlapping device spaces is the 
   * zero padding around each device space. The borders around each device 
   * space is automatically padded with zeroes before the pointers are returned 
@@ -287,7 +299,9 @@
   * adjacent device spaces there are. In the case of a one-device voxelization, 
   * the proper space is the same as the one device space, and thus all adjacent 
   * device spaces are false, and the only thing that needs to be done is to 
-  * adjust all coordinates by one to "overcome" the initial padding.
+  * adjust all coordinates by one to "overcome" the initial padding. When 
+  * voxelizing \p FCC \p Nodes, the padding becomes two voxels thick along the 
+  * x-axis due to the way the voxelization is contructed.
   *
   * The slicing algorithm uses the adjacent device space flags in order to 
   * force voxelization of adjacent slices, so that the \p Nodes of the relevant 
@@ -534,6 +548,83 @@
   * configuration they would have been in if the voxelization had truly been 
   * performed along the x-axis, the \p fillNodeList2() kernel is called to 
   * calculate the boundary ids.
+  *
+  * \subsection mainpage_fcc FCC Nodes
+  *
+  * If the \p Node type is chosen to be either \p ShortFCCNode or \p 
+  * LongFCCNode, then the voxelization is going to be performed on a \p FCC 
+  * (Face Centered Cubic) lattice. The (x, y, z)-coordinates of an individual 
+  * \p Node can be determined identically to the ordinary voxelization, but 
+  * the interpretation of these coordinates differs somewhat. node_types.h 
+  * contains information about how the coordinates map to actual real world 
+  * coordinates.
+  *
+  * The FCC voxelization is produced by the same methods as the ordinary 
+  * voxelization. There are no option booleans that need to be set to diverge 
+  * execution to FCC-specific code -- This is handled by the static function 
+  * \p isFCCNode() that each \p Node class has. \p Voxelizer::voxelizeEntry() 
+  * is mostly unchanged, excepting certain allocations due to the differing 
+  * sizes between normal grids and FCC grids. The FCC implementation has its 
+  * own worker function, however, and it is called \p Voxelizer::fccWorker().
+  *
+  * The FCC grid is constructed by merging four regular, rectilinear grids that 
+  * are all slightly shifted in relation to each other. This translates quite 
+  * easily to four separate voxelizations that are smaller in size than what 
+  * the resulting FCC grid is going to be. No large changes need to be made 
+  * to the program flow other than setting up the voxelizations, performing 
+  * them and translating their data into the array of \p Nodes. Analogously, 
+  * the materials are also calculated by performing four surface voxelizations 
+  * which are then combined into the \p Node grid.
+  *
+  * The function that translates a voxel grid to a \p Node grid is called 
+  * \p convertToFCCGrid() and works more or less in the same way as \p
+  * constructNodeLst2(), the only difference being that it has different cases 
+  * for each of the four voxelizations.
+  *
+  * The materials are handled the same way as with other \p Node types, but 
+  * instead of always passing 1 as the voxel grid type by default, the 
+  * voxel grids are assigned grid types from 1 to 4 and then the processVoxel() 
+  * function assignes the data in the grids to the appropriate places in the 
+  * \p Node grid, pretty much identically to how it's done in 
+  * convertToFCCGrid().
+  *
+  * The actual voxel grids are setup in the following way:
+  *
+  * - Grid 1: \f$ \mathbf{vec{bbox}}_{min}^{new} = 
+  *   \mathbf{vec{bbox}}_{min}^{old} + \left( 0, 0, 0 \right) \f$.
+  * - Grid 2: \f$ \mathbf{vec{bbox}}_{min}^{new} = 
+  *   \mathbf{vec{bbox}}_{min}^{old} + \left( \frac{d}{2}, \frac{d}{2}, 0 
+  *   \right) \f$.
+  * - Grid 3: \f$ \mathbf{vec{bbox}}_{min}^{new} = 
+  *   \mathbf{vec{bbox}}_{min}^{old} + \left( 0, \frac{d}{2}, \frac{d}{2} 
+  *   \right) \f$.
+  * - Grid 4: \f$ \mathbf{vec{bbox}}_{min}^{new} = 
+  *   \mathbf{vec{bbox}}_{min}^{old} + \left( \frac{d}{2}, 0, \frac{d}{2} 
+  *   \right) \f$.
+  *
+  * The \f$ d \f$ refers to the distance between voxel centers along the main 
+  * axes.
+  *
+  * The translation from voxel coordinates to \p Node indices happens in 
+  * the following way:
+  *
+  * - Grid 1: \f$ A \cdot 2z + L \cdot y + 2x \f$.
+  * - Grid 2: \f$ A \cdot 2z + L \cdot y + 2x + 1 \f$.
+  * - Grid 3: \f$ A \cdot \left( 2z + 1 \right) + L \cdot y + 2x \f$.
+  * - Grid 4: \f$ A \cdot \left( 2z + 1 \right) + L \cdot y + 2x + 1 \f$.
+  *
+  * Where \f$ L = 2 \cdot dim_{x} \text{and} A = L \cdot dim_{y} \f$.
+  *
+  * The function that calculates the boundary ids of the \p Nodes is called 
+  * calculateFCCBoundaries(), and works in pretty much the same way as 
+  * fillNodeList2(), except that it doesn't currently perform \p Node pruning 
+  * of bad \p Nodes.
+  *
+  * The zeroPadding() function has also been updated to take into account the 
+  * fact that FCC Nodes have two coordinates worth of padding on boths ends 
+  * of the grid along the x- and z-axes. The extra padding comes from the fact 
+  * that the four voxelizations also have padding around them, and this carries 
+  * over to the \p Node grid during the combining.
   ****************************************************************************/
 
 #include "node_types.h"
@@ -561,12 +652,13 @@ namespace vox {
  * The correct interpretation of the data depends on where it came from.
  * If multiple devices are in use, then the entire voxelization space is 
  * subdivided into multiple smaller spaces which are voxelized by each device.
- * The "coordinates" of each \a subspace is given by the \p loc variable, and 
- * simply correspond to the x-, y- and z-coordinates of the \a subspace in 
- * relation to the whole space.
+ * The "coordinates" of each \a device \a space is given by the \p loc 
+ * variable, and simply correspond to the x-, y- and z-coordinates of the \a 
+ * device \a space in relation to the whole space.
  * 
- * \tparam Node Type of \p Node used in the result. It is the same as the \p 
- *              Node type the \p Voxelizer is initialized with.
+ * \tparam Node Type of \p Node used in the result if it is interpreted as an 
+*               array of \p Nodes. It is the same as the \p Node type the \p 
+*               Voxelizer is initialized with.
  *****************************************************************************/
 template <class Node>
 struct NodePointer {
@@ -600,7 +692,7 @@ struct NodePointer {
  * number of voxels along each dimension is then automatically determined.
  *
  * \tparam Node Type of \p Node to be used in the result. Applies to all 
- *              functions that return \p Nodes.
+ *              functions that claim to return \p Nodes.
  *****************************************************************************/
 template <class Node = ShortNode>
 class Voxelizer
@@ -769,7 +861,7 @@ public:
              , uint _nrOfVertices
              , uint _nrOfTriangles
              , uint _nrOfUniqueMaterials );
-    /// Destructor cleans everything except returned data.
+    /// Default destructor.
     ~Voxelizer() {};
 
     /// Voxelize into an integer representation, returning device pointer(s).
@@ -880,7 +972,7 @@ public:
     uint3 getArrayDimensions( double cubeLength
                             , uint maxInternalXSize
                             , bool sliceAlongX );
-
+    /// Simulates multiple devices on the CPU and returns host pointers.
     std::vector<NodePointer<Node>> simulateMultidevice( 
         std::function<std::vector<NodePointer<Node>>()> func );
 };

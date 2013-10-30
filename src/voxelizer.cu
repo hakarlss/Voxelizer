@@ -4720,7 +4720,7 @@ __global__ void vox::zeroPadding
         {
             if ( x < 2 || x > dimensions.x - 3 ||
                  y == 0 || y == dimensions.y - 1 || 
-                 z == 0 || z == dimensions.z - 1 )
+                 z < 2 || z > dimensions.z - 3 )
             {
                 nodes[n] = Node();
             }

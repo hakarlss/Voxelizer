@@ -11,6 +11,8 @@
 
 #include <iterator>
 
+namespace vox {
+
 /**************************************************************************//**
  * Constructs the voxelizer with the minimum amount of required data.
  * Does not use the given arrays beyond this contructor: Copies are made
@@ -22,7 +24,7 @@
  * \param[in] _nrOfVertices The total number of vertices defined in _vertices.
  * \param[in] _nrOfTriangles The total number of triangles defined in _indices.
  *****************************************************************************/
-template <class Node> vox::Voxelizer<Node>::Voxelizer(
+template <class Node> Voxelizer<Node>::Voxelizer(
     float const * _vertices, 
     uint  const * _indices, 
     uint		  _nrOfVertices, 
@@ -65,7 +67,7 @@ template <class Node> vox::Voxelizer<Node>::Voxelizer(
  *                                 provided. Some \p Node implementations have 
  *                                 a limit.
  *****************************************************************************/
-template <class Node> vox::Voxelizer<Node>::Voxelizer(
+template <class Node> Voxelizer<Node>::Voxelizer(
     float const * _vertices, 
     uint  const * _indices, 
     uchar const * _materials, 
@@ -78,13 +80,12 @@ template <class Node> vox::Voxelizer<Node>::Voxelizer(
     this->setMaterials( _materials, _nrOfUniqueMaterials );
 }
 /**************************************************************************//**
- * Initializes various variables, including the memory manager and the 
- * number of available devices on the computer, courtesy of CUDA.
- * It is generally important that pointers be initialized to \p NULL whenever
+ * Initializes various variables, including the number of available devices on 
+ * the computer, courtesy of CUDA. 
  * they don't point anywhere.
  *****************************************************************************/
 template <class Node> 
-void vox::Voxelizer<Node>::initVariables()
+void Voxelizer<Node>::initVariables()
 {
     this->fatalError = false;
 
@@ -96,11 +97,10 @@ void vox::Voxelizer<Node>::initVariables()
 /**************************************************************************//**
  * Deallocates any and all dynamically allocated memory that can be connected
  * to any device. This includes some host memory that has to have 
- * separate copies per device. The deallocations only apply to the contents 
- * of the \p DevContext struct for a particular device.
+ * separate copies per device.
  *****************************************************************************/
 template <class Node> 
-void vox::Voxelizer<Node>::deallocate()
+void Voxelizer<Node>::deallocate()
 {
     this->devices.clear();
 }
@@ -113,11 +113,11 @@ void vox::Voxelizer<Node>::deallocate()
  * \param[in] device The device this function applies to.
  *****************************************************************************/
 template <class Node>
-void vox::Voxelizer<Node>::deallocateVoxelizationData( 
+void Voxelizer<Node>::deallocateVoxelizationData( 
     DevContext<Node> & device )
 {
-    // The memory manager can automatically determine which device the 
-    // pointers belong to.
+    // Calling reset() on the DevPtr-class causes its destructor to free the 
+    // allocated device memory.
     device.tileOverlaps_gpu.reset();
     device.workQueueTriangles_gpu.reset();
     device.workQueueTiles_gpu.reset();
@@ -125,8 +125,8 @@ void vox::Voxelizer<Node>::deallocateVoxelizationData(
     device.tileList_gpu.reset();
     device.tileOffsets_gpu.reset();
 
-    // vector::shrink_to_fit() should deallocate its array, since the size()
-    // should return zero.
+    // vector::shrink_to_fit() should deallocate its array, since the vector 
+    // should never have a size larger than zero.
     device.tileOverlaps.shrink_to_fit();
     device.offsetBuffer.shrink_to_fit();
     device.workQueueTriangles.shrink_to_fit();
@@ -142,7 +142,7 @@ void vox::Voxelizer<Node>::deallocateVoxelizationData(
  * \param[in] nrOfUsedDevices The requested number of devices.
  *****************************************************************************/
 template <class Node> 
-void vox::Voxelizer<Node>::initDevices( uint nrOfUsedDevices )
+void Voxelizer<Node>::initDevices( uint nrOfUsedDevices )
 {
     if ( this->options.verbose )
         std::cout << "Found " << this->nrOfDevices << " CUDA capable "
@@ -155,6 +155,7 @@ void vox::Voxelizer<Node>::initDevices( uint nrOfUsedDevices )
          !this->options.simulateMultidevice )
         throw Exception( "Not enough devices to satisfy request.\n" );
 
+    // Make as many DevContexts as there are devices being used.
     this->devices.clear();
     this->devices.resize( nrOfUsedDevices );
 
@@ -185,7 +186,8 @@ void vox::Voxelizer<Node>::initDevices( uint nrOfUsedDevices )
  * Updates the material to triangle mapping. The supplied array needs to be 
  * of the same format as in the extended constructor, i.e. have one unsigned 
  * char per triangle id. The materials array is copied to local storage, so 
- * it can be safely deleted after the call.
+ * it can be safely deleted after the call. Automatically enables the material 
+ * calculations.
  * \param[in] _materials Array of unsigned characters, where each char 
  *                       corresponds to some material id and each index to a 
  *                       triangle id.
@@ -194,17 +196,16 @@ void vox::Voxelizer<Node>::initDevices( uint nrOfUsedDevices )
  *                                 \p Node implementations may limit it more.
  *****************************************************************************/
 template <class Node> 
-void vox::Voxelizer<Node>::setMaterials(
+void Voxelizer<Node>::setMaterials(
     uchar const * _materials, 
     uint		  _nrOfUniqueMaterials )
 {
     if (_materials == NULL)
-        throw Exception( "No valid materials provided (Received null \
-                                 pointer) @ setMaterials." );
+        throw Exception( "No valid materials provided (Received null pointer)"
+                         " @ setMaterials." );
     if ( _nrOfUniqueMaterials > uint( Node::maxMat() + 1 ) )
-        throw Exception( "The number of unique materials exceeds the \
-                                 capabilities of the node type. \
-                                 @ setMaterials." );
+        throw Exception( "The number of unique materials exceeds the "
+                         "capabilities of the node type @ setMaterials." );
 
     this->hostVars.nrOfUniqueMaterials = _nrOfUniqueMaterials;
 
@@ -228,21 +229,9 @@ void vox::Voxelizer<Node>::setMaterials(
  * \param[in] _materials \p true to enable materials, \p false to disable them.
  *****************************************************************************/
 template <class Node> 
-void vox::Voxelizer<Node>::setMaterialOutput( bool _materials )
+void Voxelizer<Node>::setMaterialOutput( bool _materials )
 {
-    /* Free any materials that may have been previously allocated on the GPUs.
-       Note that the materials array on the host side cannot be deleted, 
-       because then there would be no way to simply enable material output
-       again.
-    */
-    if ( _materials == false )
-    {
-        this->options.materials = false;
-        for ( int i = 0; i < this->devices.size(); ++i )
-            this->devices[i]->materials_gpu.reset();
-    }
-    else
-        this->options.materials = true;
+    this->options.materials = _materials;
 }
 /**************************************************************************//**
  * Calculates the plain, integer voxelization given a \a subspace and some 
@@ -261,7 +250,7 @@ void vox::Voxelizer<Node>::setMaterialOutput( bool _materials )
  * \param[in] device Which device the voxelization is performed on.
  *****************************************************************************/
 template <class Node> 
-void vox::Voxelizer<Node>::performVoxelization(
+void Voxelizer<Node>::performVoxelization(
     Bounds<uint2>         yzSubSpace,
     uint				  xRes,
     uint				  nrOfXSlices,
@@ -372,7 +361,7 @@ void vox::Voxelizer<Node>::performVoxelization(
  * \param[in] device Which device the allocations happen on.
  *****************************************************************************/
 template <class Node> 
-void vox::Voxelizer<Node>::allocStaticMem( DevContext<Node> & device )
+void Voxelizer<Node>::allocStaticMem( DevContext<Node> & device )
 {
     // Calculates the allocated dimensions from the bounding box.
     uint3 res = device.allocResolution.max - device.allocResolution.min;
@@ -452,7 +441,7 @@ void vox::Voxelizer<Node>::allocStaticMem( DevContext<Node> & device )
  *                       with the multiplier.
  *****************************************************************************/
 template <class Node> 
-void vox::Voxelizer<Node>::reAllocDynamicMem(
+void Voxelizer<Node>::reAllocDynamicMem(
     DevContext<Node> & device, 
     float multiplier )
 {
@@ -511,7 +500,7 @@ void vox::Voxelizer<Node>::reAllocDynamicMem(
  *         other relevant information, such as the size of the array.
  *****************************************************************************/
 template <class Node> 
-auto vox::Voxelizer<Node>::voxelize( uint  maxDimension,
+auto Voxelizer<Node>::voxelize( uint  maxDimension,
                                 uint2 devConfig,
                                 uint3 voxSplitRes )
     -> std::vector<NodePointer<Node>> 
@@ -569,7 +558,7 @@ auto vox::Voxelizer<Node>::voxelize( uint  maxDimension,
  *         other relevant information, such as the size of the array.
  *****************************************************************************/
 template <class Node> 
-auto vox::Voxelizer<Node>::voxelize( double cubeLength,
+auto Voxelizer<Node>::voxelize( double cubeLength,
                                 uint2 devConfig,
                                 uint3 voxSplitRes )
     -> std::vector<NodePointer<Node>> 
@@ -622,7 +611,7 @@ auto vox::Voxelizer<Node>::voxelize( double cubeLength,
  * \p voxelizeWorker(). After this function has returned, the voxelization is 
  * complete and can be retrieved from the various data structures.
  * \todo Voxelizing to file.
- * \throws vox::Exception if filename is not \p NULL or CUDA produced an error.
+ * \throws Exception if filename is not \p NULL or CUDA produced an error.
  * \param[in] deviceConfig The number of times the voxelization space needs to 
  *                         be subdivided in both the y- and z-directions.
  * \param[in] voxSplitRes Maximum internal voxelization dimensions.
@@ -631,7 +620,7 @@ auto vox::Voxelizer<Node>::voxelize( double cubeLength,
  * \param[in] filename Not in use. Throws exception if not \p NULL.
  *****************************************************************************/
 template <class Node> 
-void vox::Voxelizer<Node>::voxelizeEntry(
+void Voxelizer<Node>::voxelizeEntry(
     uint2		 deviceConfig, 
     uint3        voxSplitRes,
     uint3        matSplitRes,
@@ -830,7 +819,7 @@ void vox::Voxelizer<Node>::voxelizeEntry(
  * \param[in] device The device the voxelization should be performed on.
  *****************************************************************************/
 template <class Node> 
-void vox::Voxelizer<Node>::voxelizeWorker( 
+void Voxelizer<Node>::voxelizeWorker( 
     uint  xRes,
     uint  xSplits,
     uint3 voxSplitRes,
@@ -1164,7 +1153,7 @@ void vox::Voxelizer<Node>::voxelizeWorker(
  * \param[in] device The device the voxelization should be performed on.
  *****************************************************************************/
 template <class Node> 
-void vox::Voxelizer<Node>::fccWorker( 
+void Voxelizer<Node>::fccWorker( 
     uint  xRes,
     uint  xSplits,
     uint3 voxSplitRes,
@@ -1610,7 +1599,7 @@ void vox::Voxelizer<Node>::fccWorker(
  *         struct.
  *****************************************************************************/
 template <class Node> 
-auto vox::Voxelizer<Node>::voxelizeToNodes( uint  maxDimension,
+auto Voxelizer<Node>::voxelizeToNodes( uint  maxDimension,
                                             uint2 devConfig,
                                             uint3 voxSplitRes,
                                             uint3 matSplitRes )
@@ -1640,7 +1629,7 @@ auto vox::Voxelizer<Node>::voxelizeToNodes( uint  maxDimension,
     return result;
 }
 template <class Node> 
-auto vox::Voxelizer<Node>::voxelizeToNodes( double cubeLength,
+auto Voxelizer<Node>::voxelizeToNodes( double cubeLength,
                                             uint2 devConfig,
                                             uint3 voxSplitRes,
                                             uint3 matSplitRes )
@@ -1665,7 +1654,7 @@ auto vox::Voxelizer<Node>::voxelizeToNodes( double cubeLength,
 /**************************************************************************//**
  * Identical to \p voxelizeToNodes(), but allocates and copies the \p Nodes to 
  * host memory after voxelization. Also doesn't support multiple devices.
- * \throws vox::Exception if CUDA encounters any errors.
+ * \throws Exception if CUDA encounters any errors.
  * \param[in] maxDimension How many voxel centers there are on the longest side
  *                         of the model's bounding box.
  * \param[in] voxSplitRes Internal maximum voxelization size per device.
@@ -1674,7 +1663,7 @@ auto vox::Voxelizer<Node>::voxelizeToNodes( double cubeLength,
  * \return A \p NodePointer struct.
  *****************************************************************************/
 template <class Node> 
-auto vox::Voxelizer<Node>::voxelizeToNodesToRAM( 
+auto Voxelizer<Node>::voxelizeToNodesToRAM( 
     uint  maxDimension,
     uint3 voxSplitRes,
     uint3 matSplitRes ) -> NodePointer<Node> 
@@ -1702,7 +1691,7 @@ auto vox::Voxelizer<Node>::voxelizeToNodesToRAM(
     return result;
 }
 template <class Node> 
-auto vox::Voxelizer<Node>::voxelizeToNodesToRAM( 
+auto Voxelizer<Node>::voxelizeToNodesToRAM( 
     double cubeLength,
     uint3 voxSplitRes,
     uint3 matSplitRes ) -> NodePointer<Node>
@@ -1730,7 +1719,7 @@ auto vox::Voxelizer<Node>::voxelizeToNodesToRAM(
  *          includes allocation and copying into another slice. It is advised 
  *          to manually rotate the model and use one of the y- or z-slicing 
  *          directions and then interpret the results accordingly.
- * \throws vox::Exception if CUDA encounters any errors along the way.
+ * \throws Exception if CUDA encounters any errors along the way.
  * \param[in] maxDimension How many voxels there are on the longest side of
  *                         the model's bounding box.
  * \param[in] direction Along which axis the two-dimensional slice should 
@@ -1756,7 +1745,7 @@ auto vox::Voxelizer<Node>::voxelizeToNodesToRAM(
  *         middle slice is the actual result.
  *****************************************************************************/
 template <class Node> 
-auto vox::Voxelizer<Node>::voxelizeSlice( uint  maxDimension
+auto Voxelizer<Node>::voxelizeSlice( uint  maxDimension
                                         , int   direction 
                                         , uint  slice
                                         , uint  devConfig
@@ -1825,7 +1814,7 @@ auto vox::Voxelizer<Node>::voxelizeSlice( uint  maxDimension
     return result;
 }
 template <class Node> 
-auto vox::Voxelizer<Node>::voxelizeSlice( double cubeLength
+auto Voxelizer<Node>::voxelizeSlice( double cubeLength
                                         , int   direction 
                                         , uint  slice
                                         , uint  devConfig
@@ -1897,7 +1886,7 @@ auto vox::Voxelizer<Node>::voxelizeSlice( double cubeLength
  *          includes allocation and copying into another slice. It is advised 
  *          to manually rotate the model and use one of the y- or z-slicing 
  *          directions and then interpret the results accordingly.
- * \throws vox::Exception if CUDA encounters an error.
+ * \throws Exception if CUDA encounters an error.
  * \param[in] maxDimension How many voxels there are on the longest side of
  *                         the model's bounding box.
  * \param[in] direction Along which axis the two-dimensional slice should 
@@ -1922,7 +1911,7 @@ auto vox::Voxelizer<Node>::voxelizeSlice( double cubeLength
  *         middle slice is the actual result.
  *****************************************************************************/
 template <class Node>
-auto vox::Voxelizer<Node>::voxelizeSliceToRAM( uint  maxDimension
+auto Voxelizer<Node>::voxelizeSliceToRAM( uint  maxDimension
                                              , int   direction
                                              , uint  slice
                                              , uint2 voxSplitRes
@@ -1978,7 +1967,7 @@ auto vox::Voxelizer<Node>::voxelizeSliceToRAM( uint  maxDimension
     return result;
 }
 template <class Node>
-auto vox::Voxelizer<Node>::voxelizeSliceToRAM( double cubeLength
+auto Voxelizer<Node>::voxelizeSliceToRAM( double cubeLength
                                              , int   direction
                                              , uint  slice
                                              , uint2 voxSplitRes
@@ -2030,7 +2019,7 @@ auto vox::Voxelizer<Node>::voxelizeSliceToRAM( double cubeLength
 }
 /**************************************************************************//**
  * Produces a plain, integer voxelization based on the given arguments.
- * \throws vox::Exception if CUDA encounters any errors.
+ * \throws Exception if CUDA encounters any errors.
  * \param[in] maxDimension The number of voxel centers along the longest side 
  *                         of the model's bounding box.
  * \param[in] voxSplitRes The max internal voxelization size.
@@ -2038,7 +2027,7 @@ auto vox::Voxelizer<Node>::voxelizeSliceToRAM( double cubeLength
  *         voxel.
  *****************************************************************************/
 template <class Node> 
-auto vox::Voxelizer<Node>::voxelizeToRAM( uint  maxDimension,
+auto Voxelizer<Node>::voxelizeToRAM( uint  maxDimension,
                                           uint3 voxSplitRes )
     -> NodePointer<Node>
 {
@@ -2067,7 +2056,7 @@ auto vox::Voxelizer<Node>::voxelizeToRAM( uint  maxDimension,
     return result;
 }
 template <class Node> 
-auto vox::Voxelizer<Node>::voxelizeToRAM( double cubeLength,
+auto Voxelizer<Node>::voxelizeToRAM( double cubeLength,
                                           uint3 voxSplitRes )
     -> NodePointer<Node>
 {
@@ -2102,7 +2091,7 @@ auto vox::Voxelizer<Node>::voxelizeToRAM( double cubeLength,
  * though its values are located in \p hostVars and not \p Options.
  *****************************************************************************/
 template <class Node> 
-void vox::Voxelizer<Node>::initOptions()
+void Voxelizer<Node>::initOptions()
 {
     this->hostVars.resolution.min = make_uint3( 0, 0, 0 );
     this->hostVars.resolution.max = make_uint3( 256, 0, 0 );
@@ -2129,7 +2118,7 @@ void vox::Voxelizer<Node>::initOptions()
  * between voxel centers is also calculated and stored in \p voxelLength.
  *****************************************************************************/
 template <class Node> 
-void vox::Voxelizer<Node>::determineBBAndResolution()
+void Voxelizer<Node>::determineBBAndResolution()
 {
     this->hostVars.minVertex = make_double3( this->hostVars.vertices[0], 
                                              this->hostVars.vertices[1],
@@ -2235,7 +2224,7 @@ void vox::Voxelizer<Node>::determineBBAndResolution()
  * \p maxVertex.
  *****************************************************************************/
 template <class Node> 
-void vox::Voxelizer<Node>::calculateBoundingBox()
+void Voxelizer<Node>::calculateBoundingBox()
 {
     this->hostVars.minVertex = make_double3( this->hostVars.vertices[0], 
                                              this->hostVars.vertices[1],
@@ -2270,7 +2259,7 @@ void vox::Voxelizer<Node>::calculateBoundingBox()
  * between voxel centers is also calculated and stored in \p voxelLength.
  *****************************************************************************/
 template <class Node> 
-void vox::Voxelizer<Node>::determineDimensions()
+void Voxelizer<Node>::determineDimensions()
 {
     double3 diffVertex = this->hostVars.maxVertex - this->hostVars.minVertex;
 
@@ -2356,7 +2345,7 @@ void vox::Voxelizer<Node>::determineDimensions()
  * \param[in] d Distance between sample points in a normal voxelization.
  *****************************************************************************/
 template <class Node> 
-void vox::Voxelizer<Node>::determineDimensions( double d )
+void Voxelizer<Node>::determineDimensions( double d )
 {
     double3 diffVertex = this->hostVars.maxVertex - this->hostVars.minVertex;
     this->hostVars.voxelLength = d;
@@ -2382,7 +2371,7 @@ void vox::Voxelizer<Node>::determineDimensions( double d )
  *                    x-direction.
  *****************************************************************************/
 template <class Node> 
-void vox::Voxelizer<Node>::adjustResolution(
+void Voxelizer<Node>::adjustResolution(
     uint xSplits )
 {
     int xMod = VOX_BPI * xSplits;
@@ -2408,7 +2397,7 @@ void vox::Voxelizer<Node>::adjustResolution(
  * \param[in] device Which device's variables are being accessed.
  *****************************************************************************/
 template <class Node> 
-void vox::Voxelizer<Node>::prepareForConstructWorkQueue( 
+void Voxelizer<Node>::prepareForConstructWorkQueue( 
     DevContext<Node> & device )
 {
     if (this->options.verbose) 
@@ -2439,7 +2428,7 @@ void vox::Voxelizer<Node>::prepareForConstructWorkQueue(
  * \param[in] filename The name of the logfile.
  *****************************************************************************/
 template <class Node> 
-void vox::Voxelizer<Node>::openLog( char const * filename )
+void Voxelizer<Node>::openLog( char const * filename )
 {
     this->log.open(filename, std::ios::out | std::ios::trunc);
     time_t rawtime;
@@ -2457,7 +2446,7 @@ void vox::Voxelizer<Node>::openLog( char const * filename )
  * \param[in] device Which device's information to write.
  *****************************************************************************/
 template <class Node> 
-void vox::Voxelizer<Node>::printGeneralInfo( DevContext<Node> & device )
+void Voxelizer<Node>::printGeneralInfo( DevContext<Node> & device )
 {
     this->openLog("Voxelizer.log");
 
@@ -2503,7 +2492,7 @@ void vox::Voxelizer<Node>::printGeneralInfo( DevContext<Node> & device )
  * \param[in] direction Deprecated.
  *****************************************************************************/
 template <class Node> 
-void vox::Voxelizer<Node>::printTileOverlaps( DevContext<Node> & device
+void Voxelizer<Node>::printTileOverlaps( DevContext<Node> & device
                                             , MainAxis direction )
 {
     this->log << "Printing tile overlaps for the " << 
@@ -2526,7 +2515,7 @@ void vox::Voxelizer<Node>::printTileOverlaps( DevContext<Node> & device
  * \param[in] direction Deprecated.
  *****************************************************************************/
 template <class Node> 
-void vox::Voxelizer<Node>::printOffsetBuffer( DevContext<Node> & device
+void Voxelizer<Node>::printOffsetBuffer( DevContext<Node> & device
                                             , MainAxis direction )
 {
     this->log << "Printing the offset buffer for the " << 
@@ -2550,7 +2539,7 @@ void vox::Voxelizer<Node>::printOffsetBuffer( DevContext<Node> & device
  * \param[in] direction Deprecated.
  *****************************************************************************/
 template <class Node> 
-void vox::Voxelizer<Node>::printWorkQueue( 
+void Voxelizer<Node>::printWorkQueue( 
     DevContext<Node> & device, 
     MainAxis direction )
 {
@@ -2576,7 +2565,7 @@ void vox::Voxelizer<Node>::printWorkQueue(
  * \param[in] direction Deprecated.
  *****************************************************************************/
 template <class Node>
-void vox::Voxelizer<Node>::printSortedWorkQueue( DevContext<Node> & device
+void Voxelizer<Node>::printSortedWorkQueue( DevContext<Node> & device
                                                , MainAxis direction )
 {
     this->log << "Printing the sorted work queue for the " << 
@@ -2602,7 +2591,7 @@ void vox::Voxelizer<Node>::printSortedWorkQueue( DevContext<Node> & device
  * \param[in] direction Deprecated.
  *****************************************************************************/
 template <class Node>
-void vox::Voxelizer<Node>::printCompactedList( DevContext<Node> & device
+void Voxelizer<Node>::printCompactedList( DevContext<Node> & device
                                              , MainAxis direction )
 {
     this->log << "Printing the compacted tile list for the " << 
@@ -2619,7 +2608,7 @@ void vox::Voxelizer<Node>::printCompactedList( DevContext<Node> & device
 }
 
 template <class Node> 
-void vox::Voxelizer<Node>::closeLog()
+void Voxelizer<Node>::closeLog()
 {
     this->log.close();
 }
@@ -2631,7 +2620,7 @@ void vox::Voxelizer<Node>::closeLog()
  * \return Number of cores per SM.
  *****************************************************************************/
 template <class Node> 
-inline int vox::Voxelizer<Node>::convertSMVer2Cores(
+inline int Voxelizer<Node>::convertSMVer2Cores(
     int major, 
     int minor ) const
 {
@@ -2684,7 +2673,7 @@ inline int vox::Voxelizer<Node>::convertSMVer2Cores(
  * be used when one or both of the memory locations have not been registered
  * with the memory manager, or one or both have been previously detached.
  * 
- * \throws vox::Exception if an error occurred with the \p cudaMemcpy() 
+ * \throws Exception if an error occurred with the \p cudaMemcpy() 
  *         operation.
  * 
  * \param[out] dest Pointer to the destination array.
@@ -2697,7 +2686,7 @@ inline int vox::Voxelizer<Node>::convertSMVer2Cores(
  *                 being transferred. Used when printing verbose messages.
  *****************************************************************************/
 template <class Node> 
-void vox::Voxelizer<Node>::devMemcpy(
+void Voxelizer<Node>::devMemcpy(
     void *		   dest, 
     void const *   src, 
     size_t		   count, 
@@ -2715,7 +2704,7 @@ void vox::Voxelizer<Node>::devMemcpy(
     checkCudaErrors( "devMemcpy" );
 }
 /**************************************************************************//**
- * \throws vox::Exception if an error occurred during the \p cudaMemset() 
+ * \throws Exception if an error occurred during the \p cudaMemset() 
  *                      operation.
  * 
  * \param[out] devPtr Pointer to the array whose memory is to be set.
@@ -2726,7 +2715,7 @@ void vox::Voxelizer<Node>::devMemcpy(
  *                 is to be memset. Used when printing verbose messages.
  *****************************************************************************/
 template <class Node> 
-void vox::Voxelizer<Node>::devMemset(
+void Voxelizer<Node>::devMemset(
     void *		 devPtr, 
     int			 value, 
     size_t		 count, 
@@ -2762,7 +2751,7 @@ void vox::Voxelizer<Node>::devMemset(
  * \return The number of subdivisions for each direction.
  *****************************************************************************/
 template <class Node>
-auto vox::Voxelizer<Node>::splitResolutionByMaxDim
+auto Voxelizer<Node>::splitResolutionByMaxDim
     ( uint3		  const & maxDimensions
     , Bounds<uint3> const & resolution 
     ) -> std::pair<uint3, std::unique_ptr<Bounds<uint3>[]>>
@@ -2802,7 +2791,7 @@ auto vox::Voxelizer<Node>::splitResolutionByMaxDim
  * \return The number of subdivisions for each direction.
  *****************************************************************************/
 template <class Node>
-auto vox::Voxelizer<Node>::splitResolutionByMaxDim
+auto Voxelizer<Node>::splitResolutionByMaxDim
     ( uint2		  const & maxDimensions
     , Bounds<uint3> const & resolution 
     ) -> std::pair<uint2, std::unique_ptr<Bounds<uint2>[]>>
@@ -2842,7 +2831,7 @@ auto vox::Voxelizer<Node>::splitResolutionByMaxDim
  * \return The number of subdivisions along the x-direction.
  *****************************************************************************/
 template <class Node>
-auto vox::Voxelizer<Node>::splitResolutionByMaxDim
+auto Voxelizer<Node>::splitResolutionByMaxDim
     ( uint				  maxDimension
     , Bounds<uint3> const & resolution 
     ) -> std::pair<uint, std::unique_ptr<Bounds<uint>[]>>
@@ -2881,7 +2870,7 @@ auto vox::Voxelizer<Node>::splitResolutionByMaxDim
  * \param[in] resolution The initial space to be subdivided.
  *****************************************************************************/
 template <class Node>
-auto vox::Voxelizer<Node>::splitResolutionByNrOfParts
+auto Voxelizer<Node>::splitResolutionByNrOfParts
     ( uint3		  const & nrOfPartitions
     , Bounds<uint3> const & resolution 
     ) -> std::unique_ptr<Bounds<uint3>[]>
@@ -2980,7 +2969,7 @@ auto vox::Voxelizer<Node>::splitResolutionByNrOfParts
  * \param[in] resolution The initial space to be subdivided.
  *****************************************************************************/
 template <class Node>
-auto vox::Voxelizer<Node>::splitResolutionByNrOfParts
+auto Voxelizer<Node>::splitResolutionByNrOfParts
     ( uint2		  const & nrOfPartitions
     , Bounds<uint3> const & resolution )
     -> std::unique_ptr<Bounds<uint2>[]>
@@ -3056,7 +3045,7 @@ auto vox::Voxelizer<Node>::splitResolutionByNrOfParts
  * \param[in] resolution The initial space to be subdivided.
  *****************************************************************************/
 template <class Node>
-auto vox::Voxelizer<Node>::splitResolutionByNrOfParts
+auto Voxelizer<Node>::splitResolutionByNrOfParts
     ( uint				  nrOfPartitions 
     , Bounds<uint3> const & resolution
     ) -> std::unique_ptr<Bounds<uint>[]>
@@ -3090,7 +3079,7 @@ auto vox::Voxelizer<Node>::splitResolutionByNrOfParts
  * \param[in] verbose \p true to enable, \p false to disable verbose output.
  *****************************************************************************/
 template <class Node>
-void vox::Voxelizer<Node>::verboseOutput(bool verbose)
+void Voxelizer<Node>::verboseOutput(bool verbose)
 {
     this->options.verbose = verbose;
 }
@@ -3112,7 +3101,7 @@ void vox::Voxelizer<Node>::verboseOutput(bool verbose)
  *****************************************************************************/
 // Rotates the vertices counter-clockwise around the z-axis.
 template <class Node>
-void vox::Voxelizer<Node>::rotateVertices()
+void Voxelizer<Node>::rotateVertices()
 {
     double3 minC = this->hostVars.minVertex;
     double3 maxC = this->hostVars.maxVertex;
@@ -3141,7 +3130,7 @@ void vox::Voxelizer<Node>::rotateVertices()
  * \return The tranformed coordinates.
  *****************************************************************************/
 template <class Node>
-uint3 vox::Voxelizer<Node>::unRotateCoords( uint3 vec, uint xDim )
+uint3 Voxelizer<Node>::unRotateCoords( uint3 vec, uint xDim )
 {
     uint3 result = vec;
 
@@ -3176,7 +3165,7 @@ uint3 vox::Voxelizer<Node>::unRotateCoords( uint3 vec, uint xDim )
  *         given parameters.
  *****************************************************************************/
 template <class Node>
-uint3 vox::Voxelizer<Node>::getArrayDimensions( uint longestSizeInVoxels
+uint3 Voxelizer<Node>::getArrayDimensions( uint longestSizeInVoxels
                                               , uint maxInternalXSize
                                               , bool sliceAlongX )
 {
@@ -3265,7 +3254,7 @@ uint3 vox::Voxelizer<Node>::getArrayDimensions( uint longestSizeInVoxels
 }
 
 template <class Node>
-uint3 vox::Voxelizer<Node>::getArrayDimensions( double cubeLength
+uint3 Voxelizer<Node>::getArrayDimensions( double cubeLength
                                               , uint maxInternalXSize
                                               , bool sliceAlongX )
 {
@@ -3363,7 +3352,7 @@ uint3 vox::Voxelizer<Node>::getArrayDimensions( double cubeLength
  * \param[in] device Which device should have its memory reset.
  *****************************************************************************/
 template <class Node>
-void vox::Voxelizer<Node>::resetDataStructures( DevContext<Node> & device )
+void Voxelizer<Node>::resetDataStructures( DevContext<Node> & device )
 {
     device.voxels_gpu.zero();
     device.workQueueTriangles_gpu.zero();
@@ -3379,7 +3368,7 @@ void vox::Voxelizer<Node>::resetDataStructures( DevContext<Node> & device )
  * 
  *****************************************************************************/
 template <class Node>
-auto vox::Voxelizer<Node>::collectData() -> std::vector<NodePointer<Node>>
+auto Voxelizer<Node>::collectData() -> std::vector<NodePointer<Node>>
 {
     std::vector<NodePointer<Node>> result;
 
@@ -3397,10 +3386,10 @@ auto vox::Voxelizer<Node>::collectData() -> std::vector<NodePointer<Node>>
  * to device pointers, the vector argumented version should be used. When 
  * voxelizing directly to host pointers, this version should be used.
  * 
- * \throws vox::Exception if CUDA reports an error.
+ * \throws Exception if CUDA reports an error.
  *****************************************************************************/
 template <class Node>
-auto vox::Voxelizer<Node>::collectData
+auto Voxelizer<Node>::collectData
     ( DevContext<Node> & device ///< [in] Which device is being used.
     , const bool hostPointers   /**< [in] \p true if a host pointer should be 
                                           produced. */
@@ -3473,7 +3462,7 @@ auto vox::Voxelizer<Node>::collectData
  * lambda function, like so:
  *
  * \code
- * vox::Voxelizer voxelizer( ... );
+ * Voxelizer voxelizer( ... );
  * auto result = simulateMultiDevice(
  *     [&] () { return voxelizer.voxelizeToNodes( ... ); } );
  * \endcode
@@ -3483,7 +3472,7 @@ auto vox::Voxelizer<Node>::collectData
  * results in the vector will be host pointers, however.
  *****************************************************************************/
 template <class Node>
-auto vox::Voxelizer<Node>::simulateMultidevice
+auto Voxelizer<Node>::simulateMultidevice
     ( 
         std::function< std::vector< NodePointer<Node> >() > func
     )
@@ -3493,8 +3482,10 @@ auto vox::Voxelizer<Node>::simulateMultidevice
     return func();
 }
 
-template class vox::Voxelizer<vox::ShortNode>;
-template class vox::Voxelizer<vox::LongNode>;
-template class vox::Voxelizer<vox::PartialNode>;
-template class vox::Voxelizer<vox::ShortFCCNode>;
-template class vox::Voxelizer<vox::LongFCCNode>;
+template class Voxelizer<ShortNode>;
+template class Voxelizer<LongNode>;
+template class Voxelizer<PartialNode>;
+template class Voxelizer<ShortFCCNode>;
+template class Voxelizer<LongFCCNode>;
+
+} // End namespace vox
