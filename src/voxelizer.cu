@@ -21,6 +21,8 @@
 
 #include <time.h>
 
+namespace vox {
+
 /**************************************************************************//**
  * Handles the sorting of the <em>work queue</em> by using \a thrust.
  * 
@@ -31,7 +33,7 @@
  * \param[in] startTime Time when the program started executing.
  * \param[in] verbose Whether or not to print what is being done.
  *****************************************************************************/
-template <class Node> void vox::sortWorkQueue(
+template <class Node> void sortWorkQueue(
     DevContext<Node> & devContext, 
     clock_t	     startTime, 
     bool		 verbose )
@@ -62,7 +64,7 @@ template <class Node> void vox::sortWorkQueue(
  * \param[in] startTime Time when the program started executing.
  * \param[in] verbose Whether or not to print what is being done.
  *****************************************************************************/
-template <class Node> void vox::compactWorkQueue(
+template <class Node> void compactWorkQueue(
     DevContext<Node> & devContext, 
     clock_t		 startTime, 
     bool		 verbose )
@@ -112,7 +114,7 @@ template <class Node> void vox::compactWorkQueue(
  * \param[in] startTime Time when the program started executing.
  * \param[in] verbose Whether or not to print what is being done.
  *****************************************************************************/
-template <class Node> void vox::calcTileOverlap(
+template <class Node> void calcTileOverlap(
     DevContext<Node>		    & devContext, 
     HostContext   const & hostContext, 
     Bounds<uint2> const & yzSubSpace, 
@@ -154,7 +156,7 @@ template <class Node> void vox::calcTileOverlap(
  * \param[in] startTime Time when the program started executing.
  * \param[in] verbose Whether or not to print what is being done.
  *****************************************************************************/
-template <class Node> void vox::calcWorkQueue(
+template <class Node> void calcWorkQueue(
     DevContext<Node>		    & devContext, 
     HostContext   const & hostContext, 
     Bounds<uint2> const & yzSubSpace,
@@ -200,7 +202,7 @@ template <class Node> void vox::calcWorkQueue(
  * \param[in] startTime Time when the program started executing.
  * \param[in] verbose Whether or not to print what is being done.
  *****************************************************************************/
-template <class Node> void vox::calcVoxelization(
+template <class Node> void calcVoxelization(
     DevContext<Node>		    & devContext, 
     HostContext   const & hostContext, 
     Bounds<uint3> const & subSpace, 
@@ -250,7 +252,7 @@ template <class Node> void vox::calcVoxelization(
  * \param[in] startTime Time when the program started executing.
  * \param[in] verbose Whether or not to print what is being done.
  *****************************************************************************/
-template <class Node> void vox::calcNodeList(
+template <class Node> void calcNodeList(
     DevContext<Node>          & devContext, 
     Bounds<uint2> const & yzSubSpace, 
     clock_t				  startTime, 
@@ -291,7 +293,7 @@ template <class Node> void vox::calcNodeList(
  * \param[in] startTime Time when the program started executing.
  * \param[in] verbose Whether or not to print what is being done.
  *****************************************************************************/
-template <class Node> void vox::launchConvertToFCCGrid(
+template <class Node> void launchConvertToFCCGrid(
     DevContext<Node>          & devContext, 
     Bounds<uint2> const & yzSubSpace, 
     int                   gridType,
@@ -331,7 +333,7 @@ template <class Node> void vox::launchConvertToFCCGrid(
  * \param[in] startTime Time when the program started executing.
  * \param[in] verbose Whether or not to print what is being done.
  *****************************************************************************/
-template <class Node> void vox::procNodeList(
+template <class Node> void procNodeList(
     DevContext<Node>          & devContext, 
     Bounds<uint2> const & yzSubSpace,
     bool                  xSlicing,
@@ -372,7 +374,7 @@ template <class Node> void vox::procNodeList(
  * \param[in] startTime Time when the program started executing.
  * \param[in] verbose Whether or not to print what is being done.
  *****************************************************************************/
-template <class Node> void vox::launchCalculateFCCBoundaries(
+template <class Node> void launchCalculateFCCBoundaries(
     DevContext<Node>          & devContext, 
     Bounds<uint2> const & yzSubSpace,
     bool                  xSlicing,
@@ -410,7 +412,7 @@ template <class Node> void vox::launchCalculateFCCBoundaries(
  * \param[in] startTime Time when the program started executing.
  * \param[in] verbose Whether or not to print what is being done.
  *****************************************************************************/
-template <class Node> void vox::calcSurfaceVoxelization(
+template <class Node> void calcSurfaceVoxelization(
     DevContext<Node>        & devContext, 
     HostContext const & hostContext, 
     clock_t				startTime, 
@@ -457,7 +459,7 @@ template <class Node> void vox::calcSurfaceVoxelization(
  * \param[in] startTime Time when the program started executing.
  * \param[in] verbose Whether or not to print what is being done.
  *****************************************************************************/
-template <class Node> void vox::calcTriangleClassification(
+template <class Node> void calcTriangleClassification(
     DevContext<Node> & devContext, 
     HostContext & hostContext, 
     clock_t		  startTime, 
@@ -468,8 +470,8 @@ template <class Node> void vox::calcTriangleClassification(
 
 
     if (verbose) 
-        std::cout << (clock() - startTime) << ": Calling classifyTriangles<<<" << 
-                blocks << ", " << threadsPerBlock << ">>>\n";
+        std::cout << (clock() - startTime) << ": Calling classifyTriangles<<<" 
+                  << blocks << ", " << threadsPerBlock << ">>>\n";
 
     // Classify the triangles by assigning them their bounding box type, 
     // dominant axis and estimated number of voxel columns to process.
@@ -543,7 +545,7 @@ template <class Node> void vox::calcTriangleClassification(
  * \param[in] verbose Whether or not to print what is being done.
  *****************************************************************************/
 template <class Node> 
-void vox::calcOptSurfaceVoxelization(
+void calcOptSurfaceVoxelization(
     DevContext<Node>          & devContext, 
     HostContext   const & hostContext, 
     Bounds<uint3> const & subSpace,
@@ -661,7 +663,7 @@ void vox::calcOptSurfaceVoxelization(
  * \param[in] verbose Whether or not to print what is being done.
  *****************************************************************************/
 template <class Node>
-void vox::makePaddingZero( DevContext<Node> & devContext,
+void makePaddingZero( DevContext<Node> & devContext,
                            bool         xSlicing,
                            clock_t      startTime,
                            bool         verbose )
@@ -696,7 +698,7 @@ void vox::makePaddingZero( DevContext<Node> & devContext,
  * \param[in] verbose Whether or not to print what is being done.
  *****************************************************************************/
 template <class Node>
-void vox::restoreRotatedNodes( DevContext<Node>          & devContext,
+void restoreRotatedNodes( DevContext<Node>          & devContext,
                                Bounds<uint2> const & yzSubSpace,
                                clock_t               startTime,
                                bool                  verbose )
@@ -716,17 +718,6 @@ void vox::restoreRotatedNodes( DevContext<Node>          & devContext,
                                          yzSubSpace );
 
     checkCudaErrors( "restoreRotatedNodes" );
-}
-
-void vox::checkCudaErrors( std::string loc )
-{
-    cudaError_t e = cudaPeekAtLastError();
-
-    if ( e != cudaSuccess )
-    {
-        std::string msg = cudaGetErrorString( e );
-        throw Exception( std::string() + "CUDA error: " + msg + " @ " + loc );
-    }
 }
 
 /**************************************************************************//**
@@ -761,7 +752,7 @@ void vox::checkCudaErrors( std::string loc )
  * triangle's bounding box, or more specifically, the yz-projected bounding 
  * box.
  *****************************************************************************/
-__global__ void vox::calculateTileOverlap
+__global__ void calculateTileOverlap
     (
     float const * vertices,      ///< [in] Vertices of the model.
     uint  const * indices,       ///< [in] Indices of the model.
@@ -901,7 +892,7 @@ __global__ void vox::calculateTileOverlap
  * increments the overlap counter after each successful overlap. 
  *****************************************************************************/
 inline __host__ __device__ 
-void vox::traverseTilesForOverlaps
+void traverseTilesForOverlaps
 ( 
     double2 const * edgeNormals,  ///< [in] Edge normals.
     double const * distances,     ///< [in] Distances to the edges.
@@ -965,7 +956,7 @@ void vox::traverseTilesForOverlaps
  * time, instead of counting the number of overlaps each triangle has, each 
  * overlapping tile is encoded into the work queue along with the triangle id.
  *****************************************************************************/
-__global__ void vox::constructWorkQueue
+__global__ void constructWorkQueue
     ( 
     float const * vertices,    ///< [in] Vertices of the model.
     uint const * indices,      ///< [in] Indices of the model.
@@ -1088,7 +1079,7 @@ __global__ void vox::constructWorkQueue
  * queue.
  *****************************************************************************/
 inline __host__ __device__ 
-void vox::traverseTilesForWorkQueue
+void traverseTilesForWorkQueue
     ( 
     double2 const * edgeNormals,  ///< [in] The edge normals.
     double const * distances,     ///< [in] Distances to the edges.
@@ -1191,7 +1182,7 @@ void vox::traverseTilesForWorkQueue
  * whole tile is processed, the bitmask and any open active segments can be 
  * processed and the global memory updated.
  *****************************************************************************/
-__global__ void vox::generateVoxelization
+__global__ void generateVoxelization
     ( 
     float const * vertices,          ///< [in] The vertices of the model.
     uint const * indices,            ///< [in] The indices of the model.
@@ -1543,7 +1534,7 @@ __global__ void vox::generateVoxelization
  * like that, in most cases anyway.
  *****************************************************************************/
 template <class Node>
-__global__ void vox::constructNodeList2
+__global__ void constructNodeList2
     ( 
     VoxInt const * voxels,    ///< [in] Integer array of voxels.
     Node * nodes,             ///< [out] Empty node array.
@@ -1627,7 +1618,7 @@ __global__ void vox::constructNodeList2
  * \f$ \frac{a}{\sqrt{2}} \f$.
  *****************************************************************************/
 template <class Node>
-__global__ void vox::convertToFCCGrid
+__global__ void convertToFCCGrid
     ( 
     VoxInt const * voxels,    ///< [in] Integer array of voxels.
     Node * nodes,             ///< [out] Empty node array.
@@ -1707,7 +1698,7 @@ __global__ void vox::convertToFCCGrid
  * burden caused by one invocation of the kernel. 
  *****************************************************************************/
 template <class Node>
-__global__ void vox::fillNodeList2
+__global__ void fillNodeList2
     ( 
     Node * nodes,             ///< [in,out] Array of Nodes.
     Bounds<uint3> resolution, ///< [in] Total bounds of this device's space.
@@ -1846,7 +1837,7 @@ __global__ void vox::fillNodeList2
  * burden caused by one invocation of the kernel. 
  *****************************************************************************/
 template <class Node>
-__global__ void vox::calculateFCCBoundaries
+__global__ void calculateFCCBoundaries
     ( 
     Node * nodes,             ///< [in,out] Array of Nodes.
     Bounds<uint3> resolution, ///< [in] Total bounds of this device's space.
@@ -1977,7 +1968,7 @@ __global__ void vox::calculateFCCBoundaries
  * y- and x-direction change places.
  *****************************************************************************/
 template <class Node>
-__global__ void vox::unRotateNodes
+__global__ void unRotateNodes
     ( Node * inputNodes        ///< [in] Filled node array to be un-rotated.
     , Node * outputNodes       ///< [out] Empty node array to be filled.
     , Bounds<uint3> resolution ///< [in] Bounds of the space allocated on device.
@@ -2054,7 +2045,7 @@ __global__ void vox::unRotateNodes
  *                        integer.
  * \return Boundary id of a \p Node that matches the given \p permutation.
  *****************************************************************************/
-inline __host__ __device__ vox::uchar vox::getOrientation( uchar permutation )
+inline __host__ __device__ uchar getOrientation( uchar permutation )
 {
     switch (permutation)
     {
@@ -2154,7 +2145,7 @@ inline __host__ __device__ vox::uchar vox::getOrientation( uchar permutation )
  * <em>triangle id</em>. Requires that the format in which the vertices are 
  * stored is an array of \p double3.
  *****************************************************************************/
-inline __host__ __device__ void vox::fetchTriangleVertices
+inline __host__ __device__ void fetchTriangleVertices
     ( float const * vertices ///< [in] Vertices of the model.
     , uint const * indices   ///< [in] Indices of the mdoel.
     , double3 * triangle     ///< [out] Array of 3 double3s.
@@ -2186,7 +2177,7 @@ inline __host__ __device__ void vox::fetchTriangleVertices
  * the voxel.
  *****************************************************************************/
 template <class Node>
-__global__ void vox::SimpleSurfaceVoxelizer
+__global__ void SimpleSurfaceVoxelizer
     ( float const * vertices  ///< [in] Vertices of the model.
     , uint const * indices    ///< [in] Indices of the model.
     , Node * nodes            ///< [out] Node array. 
@@ -2275,7 +2266,7 @@ __global__ void vox::SimpleSurfaceVoxelizer
  * corners of the bounding box.
  * This version uses \p float3.
  *****************************************************************************/
-inline __host__ __device__ void vox::getTriangleBounds
+inline __host__ __device__ void getTriangleBounds
     ( float3 const * vertices ///< [in] Vertices of the triangle.
     , Bounds<float3> & bounds ///< [out] Bounding box of the triangle.
     )
@@ -2309,7 +2300,7 @@ inline __host__ __device__ void vox::getTriangleBounds
  * corners of the bounding box.
  * This version uses \p double3.
  *****************************************************************************/
-inline __host__ __device__ void vox::getTriangleBounds
+inline __host__ __device__ void getTriangleBounds
     ( double3 const * vertices ///< [in] Vertices of the triangle.
     , Bounds<double2> & bounds ///< [out] Bounding box of the triangle.
     )
@@ -2338,7 +2329,7 @@ inline __host__ __device__ void vox::getTriangleBounds
  * Expects the triangle's bounding box to be made of \p float3 and returns a 
  * bounding box made of \p uint3.
  *****************************************************************************/
-inline __host__ __device__ void vox::getVoxelBounds
+inline __host__ __device__ void getVoxelBounds
     ( Bounds<float3> const & triBB   ///< [in] Triangle's bounding box.
     , float3 const & modelBBMin      /**< [in] Minimum corner of the device's 
                                                voxelization space. */
@@ -2361,7 +2352,7 @@ inline __host__ __device__ void vox::getVoxelBounds
  * Expects the triangle's bounding box to be made of \p double2 and returns a 
  * bounding box made of \p double2.
  *****************************************************************************/
-inline __host__ __device__ void vox::getVoxelBoundsDouble
+inline __host__ __device__ void getVoxelBoundsDouble
     ( Bounds<double2> const & triBB ///< [in] Triangle's bounding box.
     , double3 const & modelBBMin    /**< [in] Minimum corner of the device's 
                                               voxelization space. */
@@ -2382,7 +2373,7 @@ inline __host__ __device__ void vox::getVoxelBoundsDouble
  * \return \p Bounds of \p int3 that describes a triangle's bounding box in 
  *         voxel coordinates.
  *****************************************************************************/
-inline __host__ __device__ vox::Bounds<int3> vox::getVoxelBoundsHalf
+inline __host__ __device__ Bounds<int3> getVoxelBoundsHalf
     ( Bounds<float3> const & triBB ///< [in] Triangle's bounding box.
     , float3 const & modelBBMin    /**< [in] Minimum corner of the device's 
                                         voxelization space. */
@@ -2410,7 +2401,7 @@ inline __host__ __device__ vox::Bounds<int3> vox::getVoxelBoundsHalf
  * \return Component of the minimum corner of the triangle's bounding box in 
  *         voxel coordinates.
  *****************************************************************************/
-inline __host__ __device__ int vox::getVoxCBoundMin
+inline __host__ __device__ int getVoxCBoundMin
     ( float v /**< [in] Component of the minimum corner of a triangle's 
                         bounding box. */
     , float m /**< [in] Component of the minimum corner of the device's 
@@ -2426,7 +2417,7 @@ inline __host__ __device__ int vox::getVoxCBoundMin
  * \return Component of the maximum corner of the triangle's bounding box in 
  *         voxel coordinates.
  *****************************************************************************/
-inline __host__ __device__ int vox::getVoxCBoundMax
+inline __host__ __device__ int getVoxCBoundMax
     ( float v /**< [in] Component of the maximum corner of a triangle's 
                         bounding box. */
     , float m /**< [in] Component of the minimum corner of the device's 
@@ -2443,7 +2434,7 @@ inline __host__ __device__ int vox::getVoxCBoundMax
  * \return The dominant axis of the triangle's normal.
  *****************************************************************************/
 inline __host__ __device__ 
-    vox::MainAxis vox::determineDominantAxis( float3 triNormal )
+    MainAxis determineDominantAxis( float3 triNormal )
 {
     MainAxis dominantAxis;
 
@@ -2466,7 +2457,7 @@ inline __host__ __device__
  * Used in surface voxelization where the dimensions of a voxel are important.
  * \return Coordinates of the minimum corner of the voxel.
  *****************************************************************************/
-inline __host__ __device__ const float3 vox::getSingleVoxelBounds
+inline __host__ __device__ const float3 getSingleVoxelBounds
     ( int x             ///< [in] X-coordinate of the voxel.
     , int y             ///< [in] Y-coordinate of the voxel.
     , int z             ///< [in] Z-coordinate of the voxel.
@@ -2489,7 +2480,7 @@ inline __host__ __device__ const float3 vox::getSingleVoxelBounds
  * a voxel are important.
  * \return Component of the coordinates of the minimum corner of a voxel.
  *****************************************************************************/
-inline __host__ __device__ float vox::getSingleVoxelBoundsComponent
+inline __host__ __device__ float getSingleVoxelBoundsComponent
     ( int coord             ///< [in] X, Y or Z coordinate of the voxel.
     , float modelBBMinComp  /**< [in] Matching component of the minimum 
                                  corner of the device's voxelization space. */
@@ -2510,7 +2501,7 @@ inline __host__ __device__ float vox::getSingleVoxelBoundsComponent
  * \p false is returned.
  * \return \p true if an overlap was found, \p false otherwise.
  *****************************************************************************/
-inline __host__ __device__ bool vox::voxelOverlapsTriangle
+inline __host__ __device__ bool voxelOverlapsTriangle
     ( float2 ds                ///< [in] Distances used in the plane overlap test.
     , OverlapData const * data ///< [in] Data for the various other overlap tests.
     , float3 triNormal         ///< [in] Triangle normal.
@@ -2540,7 +2531,7 @@ inline __host__ __device__ bool vox::voxelOverlapsTriangle
  * Precalculates the data needed for the plane overlap test.
  * \return The distances used in the plane overlap test.
  *****************************************************************************/
-inline __host__ __device__ float2 vox::setupPlaneOverlapTest
+inline __host__ __device__ float2 setupPlaneOverlapTest
     ( float3 const * tri ///< [in] Triangle vertices.
     , float3 n           ///< [in] Triangle normal.
     , float d            ///< [in] Distance to voxel center.
@@ -2566,7 +2557,7 @@ inline __host__ __device__ float2 vox::setupPlaneOverlapTest
  * voxelization.
  * \return The precalculated data that is used in the actual test.
  *****************************************************************************/
-inline __host__ __device__ vox::OverlapData vox::setupOverlapTest
+inline __host__ __device__ OverlapData setupOverlapTest
     ( float3 const * tri ///< [in] Triangle vertices.
     , float3 n           ///< [in] Triangle normal.
     , float d            ///< [in] Distance between voxel centers.
@@ -2584,7 +2575,7 @@ inline __host__ __device__ vox::OverlapData vox::setupOverlapTest
 /**************************************************************************//**
  * \return Edge normals and distances wrapped in a \p OverlapData struct.
  *****************************************************************************/
-inline __host__ __device__ vox::OverlapData vox::setupYZOverlapTest
+inline __host__ __device__ OverlapData setupYZOverlapTest
     ( float3 const * tri ///< [in] Triangle vertices.
     , float3 n           ///< [in] Triangle normal.
     , float d            ///< [in] Distance between voxel centers.
@@ -2612,7 +2603,7 @@ inline __host__ __device__ vox::OverlapData vox::setupYZOverlapTest
 /**************************************************************************//**
  * \return Edge normals and distances wrapped in a \p OverlapData struct.
  *****************************************************************************/
-inline __host__ __device__ vox::OverlapData vox::setupZXOverlapTest
+inline __host__ __device__ OverlapData setupZXOverlapTest
     ( float3 const * tri ///< [in] Triangle vertices.
     , float3 n           ///< [in] Triangle normal.
     , float d            ///< [in] Distance between voxel centers.
@@ -2640,7 +2631,7 @@ inline __host__ __device__ vox::OverlapData vox::setupZXOverlapTest
 /**************************************************************************//**
  * \return Edge normals and distances wrapped in a \p OverlapData struct.
  *****************************************************************************/
-inline __host__ __device__ vox::OverlapData vox::setupXYOverlapTest
+inline __host__ __device__ OverlapData setupXYOverlapTest
     ( float3 const * tri ///< [in] Triangle vertices.
     , float3 n           ///< [in] Triangle normal.
     , float d            ///< [in] Distance between voxel centers.
@@ -2670,7 +2661,7 @@ inline __host__ __device__ vox::OverlapData vox::setupXYOverlapTest
  * usable only with voxel centers, and not entire voxels.
  * \return Edge normals and distances wrapped in a \p OverlapData struct.
  *****************************************************************************/
-inline __host__ __device__ vox::OverlapData vox::setupSimpleYZOverlapTest
+inline __host__ __device__ OverlapData setupSimpleYZOverlapTest
     ( float3 const * tri ///< [in] Triangle vertices.
     , float3 n           ///< [in] Triangle normal.
     , float d            ///< [in] Distance between voxel centers.
@@ -2698,7 +2689,7 @@ inline __host__ __device__ vox::OverlapData vox::setupSimpleYZOverlapTest
  * usable only with voxel centers, and not entire voxels.
  * \return Edge normals and distances wrapped in a \p OverlapData struct.
  *****************************************************************************/
-inline __host__ __device__ vox::OverlapData vox::setupSimpleZXOverlapTest
+inline __host__ __device__ OverlapData setupSimpleZXOverlapTest
     ( float3 const * tri ///< [in] Triangle vertices.
     , float3 n           ///< [in] Triangle normal.
     , float d            ///< [in] Distance between voxel centers.
@@ -2726,7 +2717,7 @@ inline __host__ __device__ vox::OverlapData vox::setupSimpleZXOverlapTest
  * usable only with voxel centers, and not entire voxels.
  * \return Edge normals and distances wrapped in a \p OverlapData struct.
  *****************************************************************************/
-inline __host__ __device__ vox::OverlapData vox::setupSimpleXYOverlapTest
+inline __host__ __device__ OverlapData setupSimpleXYOverlapTest
     ( float3 const * tri ///< [in] Triangle vertices.
     , float3 n           ///< [in] Triangle normal.
     , float d            ///< [in] Distance between voxel centers.
@@ -2752,7 +2743,7 @@ inline __host__ __device__ vox::OverlapData vox::setupSimpleXYOverlapTest
  * \return \p true if the plane of the triangle overlaps the voxel, \p false 
  *         otherwise.
  *****************************************************************************/
-inline __host__ __device__ bool vox::planeOverlapTest
+inline __host__ __device__ bool planeOverlapTest
     ( float2 ds        ///< [in] Distances.
     , float3 triNormal ///< [in] Triangle normal.
     , float3 p         ///< [in] Voxel's minimum corner in world coordinates.
@@ -2766,7 +2757,7 @@ inline __host__ __device__ bool vox::planeOverlapTest
  * determines which test is performed.
  * \return \p true if the overlap test succeeded, \p false otherwise.
  *****************************************************************************/
-inline __host__ __device__ bool vox::overlapTest
+inline __host__ __device__ bool overlapTest
     ( OverlapData data ///< [in] Data used during the overlap test.
     , float3 p         ///< [in] Voxel's minimum corner in world coordinates.
     , MainAxis axis    ///< [in] Axis along which the projections occur.
@@ -2800,7 +2791,7 @@ inline __host__ __device__ bool vox::overlapTest
  *         false otherwise.
  *****************************************************************************/
 inline __host__ __device__ 
-    bool vox::overlapTestYZ( OverlapData data, float3 p )
+    bool overlapTestYZ( OverlapData data, float3 p )
 {
     bool testResults = true;
     float2 p2;
@@ -2819,7 +2810,7 @@ inline __host__ __device__
  *         false otherwise.
  *****************************************************************************/
 inline __host__ __device__ 
-    bool vox::overlapTestZX( OverlapData data, float3 p )
+    bool overlapTestZX( OverlapData data, float3 p )
 {
     bool testResults = true;
     float2 p2;
@@ -2838,7 +2829,7 @@ inline __host__ __device__
  *         false otherwise.
  *****************************************************************************/
 inline __host__ __device__ 
-    bool vox::overlapTestXY( OverlapData data, float3 p )
+    bool overlapTestXY( OverlapData data, float3 p )
 {
     bool testResults = true;
     float2 p2;
@@ -2852,7 +2843,7 @@ inline __host__ __device__
 }
 
 template <class Node>
-inline __device__ void vox::processVoxel
+inline __device__ void processVoxel
     ( Node * nodes            ///< [out] Node array.
     , uchar const * materials ///< [in] Material to triangle mapping.
     , uint triangleIdx        ///< [in] Current triangle index.
@@ -2901,7 +2892,7 @@ inline __device__ void vox::processVoxel
  * the fraction of the \p Node that is solid before writing the node to memory.
  *****************************************************************************/
 template <>
-inline __device__ void vox::processVoxel<vox::PartialNode>
+inline __device__ void processVoxel<PartialNode>
     ( PartialNode * nodes     ///< [out] Array of PartialNodes.
     , uchar const * materials ///< [in] Material to triangle mapping.
     , uint triangleIdx        ///< [in] Current triangle index.
@@ -2942,7 +2933,7 @@ inline __device__ void vox::processVoxel<vox::PartialNode>
  * so that similar triangles would be processed close to each other. Most of 
  * the actual work is done in the analyzeBoundingBox() function.
  *****************************************************************************/
-__global__ void vox::classifyTriangles
+__global__ void classifyTriangles
     ( float const * vertices ///< [in] Vertices of the model.
     , uint const * indices   ///< [in] Indices of the model.
     , uint * triTypeBuffer   ///< [out] Array of triangle types to write to.
@@ -3019,7 +3010,7 @@ __global__ void vox::classifyTriangles
  *         voxel columns the triangle spans at most along the dominant axis, 
  *         wrapped into a \p TriData struct.
  *****************************************************************************/
-inline __host__ __device__ const vox::TriData vox::analyzeBoundingBox
+inline __host__ __device__ const TriData analyzeBoundingBox
     ( Bounds<float3> triBB ///< [in] Triangle's bounding box.
     , float3 triNormal     ///< [in] Triangle normal.
     , float3 modelBBMin    /**< [in] Minimum corner of the device's voxel 
@@ -3116,7 +3107,7 @@ inline __host__ __device__ const vox::TriData vox::analyzeBoundingBox
  * \param[in] data The triangle data wrapped in a \p TriData struct.
  * \return An unsigned integer that encodes the information within the data.
  *****************************************************************************/
-inline __host__ __device__ vox::uint vox::encodeTriangleType( TriData data )
+inline __host__ __device__ uint encodeTriangleType( TriData data )
 {
     int bits = VOX_BPI - 4;
     uint bb_type = uint(data.bbType) << (bits + 2);
@@ -3129,7 +3120,7 @@ inline __host__ __device__ vox::uint vox::encodeTriangleType( TriData data )
  * \return Decoded \p TriData.
  *****************************************************************************/
 inline __host__ __device__ 
-    const vox::TriData vox::decodeTriangleType( uint type )
+    const TriData decodeTriangleType( uint type )
 {
     TriData data;
 
@@ -3143,7 +3134,7 @@ inline __host__ __device__
  * \param[in] type Encoded \p TriData.
  * \return Bounding box type.
  *****************************************************************************/
-inline __host__ __device__ vox::BBType vox::readBBType( uint type )
+inline __host__ __device__ BBType readBBType( uint type )
 {
     return static_cast<BBType>(type >> (VOX_BPI - 2));
 }
@@ -3151,7 +3142,7 @@ inline __host__ __device__ vox::BBType vox::readBBType( uint type )
  * \param[in] type Encoded \p TriData.
  * \return Dominant axis.
  *****************************************************************************/
-inline __host__ __device__ vox::MainAxis vox::readDomAxis( uint type )
+inline __host__ __device__ MainAxis readDomAxis( uint type )
 {
     return static_cast<MainAxis>((type >> (VOX_BPI - 4)) & 3u);
 }
@@ -3159,7 +3150,7 @@ inline __host__ __device__ vox::MainAxis vox::readDomAxis( uint type )
  * \param[in] type Encoded \p TriData.
  * \return Number of voxel columns.
  *****************************************************************************/
-inline __host__ __device__ vox::uint vox::readNrOfVoxCols( uint type )
+inline __host__ __device__ uint readNrOfVoxCols( uint type )
 {
     return type & ((1 << (VOX_BPI - 4)) - 1);
 }
@@ -3169,7 +3160,7 @@ inline __host__ __device__ vox::uint vox::readNrOfVoxCols( uint type )
  * \return The largest surface area of a single face.
  *****************************************************************************/
 inline __host__ __device__ 
-    vox::uint vox::calculateLargestSideOfVoxels( uint3 res )
+    uint calculateLargestSideOfVoxels( uint3 res )
 {
     uint result;
 
@@ -3209,7 +3200,7 @@ inline __host__ __device__
  * voxels in its bounding box. No overlap tests need to be performed.
  *****************************************************************************/
 template <class Node>
-__global__ void vox::process1DTriangles
+__global__ void process1DTriangles
     ( float const * vertices        ///< [in] Vertices of the model.
     , uint const * indices          ///< [in] Indices of the model.
     , uint const * triTypes         ///< [in] Triangle classifications.
@@ -3321,7 +3312,7 @@ __global__ void vox::process1DTriangles
  * be tested for overlap along its dominant axis.
  *****************************************************************************/
 template <class Node>
-__global__ void vox::process2DTriangles
+__global__ void process2DTriangles
     ( float const * vertices        ///< [in] Vertices of the model.
     , uint const * indices          ///< [in] Indices of the model.
     , uint const * triTypes         ///< [in] Triangle classifications.
@@ -3506,7 +3497,7 @@ __global__ void vox::process2DTriangles
  * be performed -- one along each main axis.
  *****************************************************************************/
 template <class Node>
-__global__ void vox::process3DTriangles
+__global__ void process3DTriangles
     ( float const * vertices        ///< [in] Vertices of the model.
     , uint const * indices          ///< [in] Indices of the model.
     , uint const * triTypes         ///< [in] Triangle classifications.
@@ -3856,7 +3847,7 @@ __global__ void vox::process3DTriangles
  * If such a common space cannot be found, a negative minimum bound is 
  * returned.
  *****************************************************************************/
-inline __host__ __device__ void vox::adjustVoxelRange
+inline __host__ __device__ void adjustVoxelRange
     ( Bounds<int3> & voxBB           /**< [in,out] Triangle's bounding box in 
                                                    voxels. */
     , Bounds<uint3> const & subSpace ///< [in] Bounding box of subspace.
@@ -3897,7 +3888,7 @@ inline __host__ __device__ void vox::adjustVoxelRange
  * how thick the triangle is, in terms of how many voxels the plane overlaps.
  * \return Minimum and maximum voxel coordinates of the plane's thickness.
  *****************************************************************************/
-inline __host__ __device__ int2 vox::determineDepthRangeX
+inline __host__ __device__ int2 determineDepthRangeX
     ( float3 * triangle ///< [in] Vertices of the triangle.
     , float3 p          ///< [in] Minimum corner of voxel.
     , float3 triNormal  ///< [in] Triangle normal.
@@ -3939,7 +3930,7 @@ inline __host__ __device__ int2 vox::determineDepthRangeX
  * how thick the triangle is, in terms of how many voxels the plane overlaps.
  * \return Minimum and maximum voxel coordinates of the plane's thickness.
  *****************************************************************************/
-inline __host__ __device__ int2 vox::determineDepthRangeY
+inline __host__ __device__ int2 determineDepthRangeY
     ( float3 * triangle ///< [in] Vertices of the triangle.
     , float3 p          ///< [in] Minimum corner of voxel.
     , float3 triNormal  ///< [in] Triangle normal.
@@ -3981,7 +3972,7 @@ inline __host__ __device__ int2 vox::determineDepthRangeY
  * how thick the triangle is, in terms of how many voxels the plane overlaps.
  * \return Minimum and maximum voxel coordinates of the plane's thickness.
  *****************************************************************************/
-inline __host__ __device__ int2 vox::determineDepthRangeZ
+inline __host__ __device__ int2 determineDepthRangeZ
     ( float3 * triangle ///< [in] Vertices of the triangle.
     , float3 p          ///< [in] Minimum corner of voxel.
     , float3 triNormal  ///< [in] Triangle normal.
@@ -4021,7 +4012,7 @@ inline __host__ __device__ int2 vox::determineDepthRangeZ
  * converted to a particular voxel that intersects the triangle.
  * \return The distance from \p p to the \a plane along \p d.
  *****************************************************************************/
-inline __host__ __device__ float vox::calculateIntersectionWithPlane
+inline __host__ __device__ float calculateIntersectionWithPlane
     ( float3 p ///< [in] Starting point of the ray.
     , float3 v ///< [in] Point on the triangle / plane.
     , float3 n ///< [in] Normal of the triangle / plane.
@@ -4040,7 +4031,7 @@ inline __host__ __device__ float vox::calculateIntersectionWithPlane
  * triangle.
  * \return The distance from \p p to the \a plane along the x-axis.
  *****************************************************************************/
-inline __host__ __device__ float vox::intersectWithPlaneX
+inline __host__ __device__ float intersectWithPlaneX
     ( float3 p ///< [in] Starting point of the ray.
     , float3 v ///< [in] Point on the triangle / plane.
     , float3 n ///< [in] Normal of the triangle / plane.
@@ -4054,7 +4045,7 @@ inline __host__ __device__ float vox::intersectWithPlaneX
  * a little faster to calculate than the more general version.
  * \return The distance from \p p to the \a plane along the y-axis.
  *****************************************************************************/
-inline __host__ __device__ float vox::intersectWithPlaneY
+inline __host__ __device__ float intersectWithPlaneY
     ( float3 p ///< [in] Starting point of the ray.
     , float3 v ///< [in] Point on the triangle / plane.
     , float3 n ///< [in] Normal of the triangle / plane.
@@ -4068,7 +4059,7 @@ inline __host__ __device__ float vox::intersectWithPlaneY
  * is a little faster to calculate than the more general version.
  * \return The distance from \p p to the \a plane along the z-axis.
  *****************************************************************************/
-inline __host__ __device__ float vox::intersectWithPlaneZ
+inline __host__ __device__ float intersectWithPlaneZ
     ( float3 p ///< [in] Starting point of the ray.
     , float3 v ///< [in] Point on the triangle / plane.
     , float3 n ///< [in] Normal of the triangle / plane.
@@ -4083,7 +4074,7 @@ inline __host__ __device__ float vox::intersectWithPlaneZ
  *           comparison operators defined.
  *****************************************************************************/
 template <class T>
-inline __host__ __device__ void vox::boundsCheck
+inline __host__ __device__ void boundsCheck
     ( T &min ///< [in,out] Minimum value of the bound.
     , T &max ///< [in,out] Maximum value of the bound.
     )
@@ -4113,7 +4104,7 @@ inline __host__ __device__ void vox::boundsCheck
  * Timmes \cite timmes-2013.
  * \return The \a volume of the cut voxel.
  *****************************************************************************/
-inline __host__ __device__ float vox::calculateVoxelPlaneIntersectionVolume
+inline __host__ __device__ float calculateVoxelPlaneIntersectionVolume
     ( float3 * triangle ///< [in] Vertices of the triangle.
     , int3 voxel        ///< [in] Voxel coordinates.
     , float3 triNormal  ///< [in] Triangle normal.
@@ -4222,7 +4213,7 @@ inline __host__ __device__ float vox::calculateVoxelPlaneIntersectionVolume
  * parallel to one of the main axes.
  * \return Volume of cut voxel.
  *****************************************************************************/
-inline __host__ __device__ float vox::boxParallelCutVolume
+inline __host__ __device__ float boxParallelCutVolume
     ( float voxCenterComponent /**< [in] X-, Y- or Z-component of the voxel 
                                          center. */
     , float triVertexComponent /**< [in] X-, Y- or Z-component of a vertex of 
@@ -4243,7 +4234,7 @@ inline __host__ __device__ float vox::boxParallelCutVolume
  * traverses the edges of the voxel in a particular order and tests for overlap 
  * between the edges and the plane.
  *****************************************************************************/
-inline __host__ __device__ void vox::constructPolyhedronFaces
+inline __host__ __device__ void constructPolyhedronFaces
     ( float3 * iPts     ///< [out] The intersection points.
     , float3 * face1    ///< [out] Vertices for face 1.
     , float3 * face2    ///< [out] Vertices for face 2.
@@ -4460,7 +4451,7 @@ inline __host__ __device__ void vox::constructPolyhedronFaces
  * choice of tip for the pyramids.
  * \return Volume of the polyhedron.
  *****************************************************************************/
-inline __host__ __device__ float vox::volumeOfPolyhedron
+inline __host__ __device__ float volumeOfPolyhedron
     ( float3 * voxVerts ///< [in] Vertices of the voxel.
     , float3 * iPts     /**< [in] Set of intersection points between the plane and 
                              voxel. */
@@ -4633,7 +4624,7 @@ inline __host__ __device__ float vox::volumeOfPolyhedron
  * rather as the \a sine and \a cosine of the angle.
  * \return The rotated point.
  *****************************************************************************/
-inline __host__ __device__ float3 vox::rotX
+inline __host__ __device__ float3 rotX
     ( float3 v     ///< [in] Point to be rotated.
     , float sine   ///< [in] Sine of the rotation angle.
     , float cosine ///< [in] Cosine of the rotation angle.
@@ -4658,7 +4649,7 @@ inline __host__ __device__ float3 vox::rotX
  * rather as the \a sine and \a cosine of the angle.
  * \return The rotated point.
  *****************************************************************************/
-inline __host__ __device__ float3 vox::rotY
+inline __host__ __device__ float3 rotY
     ( float3 v     ///< [in] Point to be rotated.
     , float sine   ///< [in] Sine of the rotation angle.
     , float cosine ///< [in] Cosine of the rotation angle.
@@ -4677,7 +4668,7 @@ inline __host__ __device__ float3 vox::rotY
  * \a pyramid. The base of the pyramid can have any number of vertices.
  * \return Volume of the pyramid.
  *****************************************************************************/
-inline __host__ __device__ float vox::volumeOfPyramid
+inline __host__ __device__ float volumeOfPyramid
     ( float3* base  ///< [in] Vertices of the base polygon.
     , int nrOfVerts ///< [in] Number of vertices in the base.
     , float3 height ///< [in] Highest point of the pyramid.
@@ -4702,7 +4693,7 @@ inline __host__ __device__ float vox::volumeOfPyramid
 
 /// \tparam Node Type of node used in the array.
 template <class Node>
-__global__ void vox::zeroPadding
+__global__ void zeroPadding
     ( Node * nodes           ///< [out] \p Node array to apply padding to.
     , const uint3 dimensions ///< [in] Dimensions of the \p Node array.
     )
@@ -4737,6 +4728,8 @@ __global__ void vox::zeroPadding
     }
 }
 /**************************************************************************//**
+ * \brief "Uses" functions to make the compiler include them into the library.
+ *
  * Dummy functions to force the compiler to instantiate templated functions.
  * Templated functions only really work if the compiler has access to all of 
  * the code when compiling a project that uses the templated functions. This 
@@ -4751,7 +4744,7 @@ __global__ void vox::zeroPadding
  * class, the functions should be added here. Then, this function will be 
  * called with each Node type from the masterDummyFunction.
  *****************************************************************************/
-template <class Node> void vox::dummyFunction()
+template <class Node> void dummyFunction()
 {
     DevContext<Node> dC;
     HostContext hC;
@@ -4774,11 +4767,14 @@ template <class Node> void vox::dummyFunction()
     restoreRotatedNodes( dC, ui2b, 0, true );
 }
 /**************************************************************************//**
+ * \brief "Uses" functions with every \p Node type to force the compiler to 
+ *        compile them.
+ * 
  * Calls the dummyFunction with all Node types in order to instantiate their 
  * template parameters. If a new node type is added, a new dummyFunction 
  * instantiation needs to be added as well.
  *****************************************************************************/
-void vox::masterDummyFunction()
+void masterDummyFunction()
 {
     dummyFunction<ShortNode>();
     dummyFunction<LongNode>();
@@ -4786,3 +4782,5 @@ void vox::masterDummyFunction()
     dummyFunction<ShortFCCNode>();
     dummyFunction<LongFCCNode>();
 }
+
+} // End namespace vox

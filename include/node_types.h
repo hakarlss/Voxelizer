@@ -1,5 +1,4 @@
-#ifndef _VOX_NODE_TYPES_H
-#define _VOX_NODE_TYPES_H
+#pragma once
 
 #include "aux_definitions.h"
 
@@ -600,7 +599,7 @@ public:
     /**********************************************************************//**
      * \brief Constructs \p LongFCCNode given a \p bid.
      * 
-     * \param[in] bim Combined <em>boundary id</em> and <em>material id</em>.
+     * \param[in] bid <em>Boundary id</em>.
      *************************************************************************/
     __host__ __device__ LongFCCNode(ushort bid): _bid(bid), _mat(0) {}
     /**********************************************************************//**
@@ -698,4 +697,3 @@ private:
 };
 
 } // End namespace vox
-#endif

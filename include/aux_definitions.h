@@ -1,6 +1,5 @@
-#ifndef _VOX_AUX_DEFS_H_
-#define _VOX_AUX_DEFS_H_
-                                                                               
+#pragma once
+
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <exception>
@@ -15,9 +14,9 @@
 
 namespace vox {
 
-typedef uint32_t uint;
-typedef uint16_t ushort;
-typedef uint8_t uchar;
+typedef uint32_t uint;   ///< \a uint is a 32-bit unsigned integer.
+typedef uint16_t ushort; ///< \a ushort is a 16-bit unsigned integer.
+typedef uint8_t uchar;   ///< \a uchar is an 8-bit unsigned integer.
 
 #define VOX32 1 // Internal representation of the voxelization.
 //#define VOX64 1 // 64-bit requires compute 3.5+ and is not implemented yet.
@@ -36,12 +35,12 @@ typedef uint64_t VoxInt;
 #error "VOX32 or VOX64 needs to be defined!"
 #endif
 
-/**************************************************************************//**
- * \brief Describes the bounding box of a triangle. 
- * 
- * Used in the surface voxelizer to mark and sort triangles by their bounding 
- * box.
- *****************************************************************************/
+///////////////////////////////////////////////////////////////////////////////
+/// \brief Describes the bounding box of a triangle. 
+/// 
+/// Used in the surface voxelizer to mark and sort triangles by their bounding 
+/// box.
+///////////////////////////////////////////////////////////////////////////////
 enum BBType
 {
     BBType_Degen = 0,   ///< Degenerate triangle.
@@ -49,42 +48,36 @@ enum BBType
     BBType_2D,          ///< Two dimensional bounding box.
     BBType_3D           ///< Full, three dimensional bounding box.
 };
-/**************************************************************************//**
- * \brief Describes one of the three main axes. 
- * 
- * Mostly deprecated now.
- *****************************************************************************/
+///////////////////////////////////////////////////////////////////////////////
+/// \brief Describes one of the three main axes. 
+/// 
+/// Mostly deprecated now.
+///////////////////////////////////////////////////////////////////////////////
 enum MainAxis
 {
     xAxis = 0,  ///< X-axis.
     yAxis,      ///< Y-axis.
     zAxis       ///< Z-axis.
 };
-/**************************************************************************//**
- * \brief Compiles a few pieces of information about a triangle. 
- * 
- * Used in the surface voxelizer.
- *****************************************************************************/
+///////////////////////////////////////////////////////////////////////////////
+/// \brief Compiles a few pieces of information about a triangle. 
+/// 
+/// Used in the surface voxelizer.
+///////////////////////////////////////////////////////////////////////////////
 struct TriData
 {
     BBType bbType;      ///< Bounding box type of the triangle.
-    MainAxis domAxis;   /**< \brief Dominant axis, i.e. which main axis of the 
-                                    normal is the largest. */
-    uint nrOfVoxCols;   /**< \brief How many voxel columns the triangle spans 
-                                    along its dominant axis. */
+    MainAxis domAxis;   ///< \brief Dominant axis, i.e. which main axis of the 
+                        ///<        normal is the largest.
+                        ///<
+    uint nrOfVoxCols;   ///< \brief How many voxel columns the triangle spans 
+                        ///<        along its dominant axis.
+                        ///<
 };
-/**************************************************************************//**
- * \brief Should be deprecated.
- *****************************************************************************/
-enum NodeType
-{
-    ShortNodeType = 0,
-    LongNodeType
-};
-/**************************************************************************//**
- * \brief Struct that collects the data needed to voxelize, including the plane
- * overlap test.
- *****************************************************************************/
+///////////////////////////////////////////////////////////////////////////////
+/// \brief Struct that collects the data needed to voxelize, including the 
+///        plane overlap test.
+///////////////////////////////////////////////////////////////////////////////
 struct TestData
 {
     float3 n;		///< Triangle normal.
@@ -93,10 +86,11 @@ struct TestData
     float de[9];	///< Edge distances.
     float3 p;		///< Voxel minimum corner.
 };
-/**************************************************************************//**
- * \brief Struct that collects the data needed to voxelize in the special case 
- * of a triangle with a 2D bounding box, but without the plane overlap test.
- *****************************************************************************/
+///////////////////////////////////////////////////////////////////////////////
+/// \brief Struct that collects the data needed to voxelize in the special case 
+///        of a triangle with a 2D bounding box, but without the plane overlap 
+///        test.
+///////////////////////////////////////////////////////////////////////////////
 struct TestData2D
 {
     float3 n;		///< Triangle normal.
@@ -104,10 +98,10 @@ struct TestData2D
     float de[3];	///< Edge distances.
     float3 p;		///< Voxel minimum corner.
 };
-/**************************************************************************//**
- * \brief Struct that collects the data needed to voxelize in the general case, 
- * but without the plane overlap test.
- *****************************************************************************/
+///////////////////////////////////////////////////////////////////////////////
+/// \brief Struct that collects the data needed to voxelize in the general 
+///        case, but without the plane overlap test.
+///////////////////////////////////////////////////////////////////////////////
 struct TestData3D
 {
     float3 n;		///< Triangle normal.
@@ -115,172 +109,258 @@ struct TestData3D
     float de[9];	///< Edge distances.
     float3 p;		///< Voxel minimum corner.
 };
-/**************************************************************************//**
- * \brief Struct that only collects the edge normals and distances used in the 
- * overlap testing.
- *****************************************************************************/
+///////////////////////////////////////////////////////////////////////////////
+/// \brief Struct that only collects the edge normals and distances used in the 
+///        overlap testing.
+///////////////////////////////////////////////////////////////////////////////
 struct OverlapData
 {
     float2 ne[3];	///< Edge normals.
     float de[3];	///< Edge distances.
 };
-/**************************************************************************//**
- * \brief Struct to represent anything that can be described with a minimum and 
- * maximum value. 
- * 
- * Used extensively to represent bounding boxes in three, two 
- * and one dimensions.
- *
- * \tparam T Type of the \p min and \p max members. 
- *****************************************************************************/
+///////////////////////////////////////////////////////////////////////////////
+/// \brief Struct to represent anything that can be described with a minimum 
+///        and maximum value. 
+/// 
+/// Used extensively to represent bounding boxes in three, two 
+/// and one dimensions.
+///
+/// \tparam T Type of the \p min and \p max members. 
+///////////////////////////////////////////////////////////////////////////////
 template <class T>
 struct Bounds
 {
     T min;  ///< Minimum value of the bound.
     T max;  ///< Maximum value of the bound.
 };
-/**************************************************************************//**
- * \brief Functor that returns \p true if the given \p TriData encoding 
- * represents the desired \p ::BBType. 
- *
- * Used with the thrust counting alogorithm to calculate where 
- * the different \p ::BBType begin and end once they've been sorted.
- *
- * \tparam T The wanted ::BBType.
- * \tparam B the particular amount of bits that need to be shifted to get at 
- *           the \p ::BBType from the encoding. It is set to <tt>VOX_BPI - 2</tt> 
- *           in the code where it is used.
- *****************************************************************************/
+///////////////////////////////////////////////////////////////////////////////
+/// \brief Functor that returns \p true if the given \p TriData encoding 
+/// represents the desired \p ::BBType. 
+///
+/// Used with the thrust counting alogorithm to calculate where 
+/// the different \p ::BBType begin and end once they've been sorted.
+///
+/// \tparam T The wanted ::BBType.
+/// \tparam B the particular amount of bits that need to be shifted to get at 
+///           the \p ::BBType from the encoding. It is set to <tt>VOX_BPI - 
+///           2</tt> in the code where it is used.
+///////////////////////////////////////////////////////////////////////////////
 template <BBType T, int B>
 struct is_BB
 {
-    /**********************************************************************//**
-     * \brief Tests if the encoded \p TriData equals the desired \p ::BBType.
-     * \param[in] x The \p TriData encoded into an \p uint.
-     * \return \p true if \p x decodes to \p T.
-     *************************************************************************/
+    ///////////////////////////////////////////////////////////////////////////
+    /// \brief Tests if the encoded \p TriData equals the desired \p ::BBType.
+    ///
+    /// \param[in] x The \p TriData encoded into an \p uint.
+    ///
+    /// \return \p true if \p x decodes to \p T.
+    ///////////////////////////////////////////////////////////////////////////
     __host__ __device__ bool operator()(const uint &x)
     {
         return (x >> B) == T;
     }
 };
-/**************************************************************************//**
- * \brief Exception class used by the Voxelizer. 
- *
- * Nothing fancy, its just using a \p string instead of a pointer to \p char.
- *****************************************************************************/
+/// Options or state-tracking variables for the voxelizer.
+struct Options
+{
+    bool nodeOutput;           ///< Whether to output integers or \p Nodes.
+    bool materials;            ///< Do \p Nodes have materials associated?
+    bool slices;               ///< If a \a slice is being voxelized.
+    uint slice;                ///< Which \a slice is being voxelized.
+    int  sliceDirection;       ///< What kind of \a slice is being made.
+    bool slicePrepared;        ///< Has the first \a slice been produced?
+    bool sliceOOB;             ///< Is the \a slice index out of bounds?
+    bool verbose;              ///< Should messages be output?
+    bool printing;             ///< Should various data be printed to file?
+    bool voxelDistanceGiven;   ///< \brief \p True if the user has specified 
+                               ///<        the distance between voxels.
+                               ///<
+    bool simulateMultidevice;  ///< \brief Simulates multiple devices on one 
+                               ///<        device.
+                               ///<
+    /// Default constructor.
+    Options() throw() : nodeOutput(false)
+                      , materials(false)
+                      , slices(false)
+                      , slice(0)
+                      , sliceDirection(-1)
+                      , slicePrepared(false)
+                      , sliceOOB(false), verbose(false)
+                      , printing(false)
+                      , voxelDistanceGiven(false)
+                      , simulateMultidevice(false) {}
+    /// Default destructor.
+    ~Options() throw() {}
+};
+///////////////////////////////////////////////////////////////////////////////
+/// \brief Exception class used by the Voxelizer. 
+///
+/// Nothing fancy, its just using a \p string instead of a pointer to \p char.
+///////////////////////////////////////////////////////////////////////////////
 class Exception : public std::exception {
 public:
+    ///////////////////////////////////////////////////////////////////////////
+    /// \brief Constructor for strings.
+    ///
+    /// \param[in] message Error message.
+    ///////////////////////////////////////////////////////////////////////////
+    Exception(std::string message) throw(): msg(message) {}
+    ///////////////////////////////////////////////////////////////////////////
+    /// \brief Constructor for C-style strings.
+    ///
+    /// \param[in] message Error message.
+    ///////////////////////////////////////////////////////////////////////////
+    Exception(char const * message) throw(): msg(std::string(message)) {}
+    /// Default destructor.
     ~Exception() throw() {}
-    /** \brief Constructor for strings.
-        
-        \param[in] message Error message. */
-    Exception(std::string message): msg(message) {}
-    /** \brief Constructor for C-style strings.
-        
-        \param[in] message Error message. */
-    Exception(char const * message): msg(std::string(message)) {}
-    /** \brief Gets the error message.
-        
-        \return Error message. */
-    char const * what() const throw() { return msg.c_str(); }
+    ///////////////////////////////////////////////////////////////////////////
+    /// \brief Gets the error message.
+    ///
+    /// \return Error message.
+    ///////////////////////////////////////////////////////////////////////////
+    const char * what() const throw() { return msg.c_str(); }
 private:
-    std::string const msg; ///< Error message.
+    const std::string msg; ///< Error message.
 };
-/**************************************************************************//**
- * \brief Allocates an object and returns it in a \p unique_ptr.
- *
- * \tparam Type or class of the object.
- * \return \p std::unique_ptr containing the object.
- *****************************************************************************/
+///////////////////////////////////////////////////////////////////////////////
+/// \brief Checks for cuda errors.
+///
+/// \throws Exception if CUDA reported an error.
+///
+/// \param[in] loc A string that describes the location where the function is 
+///                used.
+///////////////////////////////////////////////////////////////////////////////
+inline void checkCudaErrors( std::string loc )
+{
+    cudaError_t e = cudaPeekAtLastError();
+
+    if ( e != cudaSuccess )
+    {
+        std::string msg = cudaGetErrorString( e );
+        throw Exception( msg + " @ " + loc );
+    }
+}
+///////////////////////////////////////////////////////////////////////////////
+/// \brief Exits the program, printing an error message if an error occurred.
+///
+/// \param[in] code Error code of some CUDA function.
+/// \param[in] file Filename of the source this function is called in.
+/// \param[in] line Line number where this function is called.
+/// \param[in] abort \p true to abort on any error, \p false to continue.
+///////////////////////////////////////////////////////////////////////////////
+inline void gpuAssert( cudaError_t code
+                     , char * file
+                     , int line
+                     , bool abort = true )
+{
+    if ( code != cudaSuccess )
+    {
+        std::string message = std::string( cudaGetErrorString( code ) ) + 
+            " in " + std::string( file ) + ", " + 
+            std::to_string( (long long)line );
+
+        if ( abort ) throw Exception( message );
+    }
+}
+/// Macro that embeds source information into the gpuAsser-function.
+#define GPU_ERRCHK(ans) vox::gpuAssert((ans), __FILE__, __LINE__)
+///////////////////////////////////////////////////////////////////////////////
+/// \brief Allocates an object and returns it in a \p unique_ptr.
+///
+/// \tparam Type or class of the object.
+/// \return \p std::unique_ptr containing the object.
+///////////////////////////////////////////////////////////////////////////////
 template<typename T>
 std::unique_ptr<T> make_unique()
 {
     return std::unique_ptr<T>( new T() );
 }
-/**************************************************************************//**
- * \brief Allocates an array of objects and returns it in a \p unique_ptr.
- *
- * \tparam Type or class of the object.
- * \return \p std::unique_ptr containing the array of objects.
- *****************************************************************************/
+///////////////////////////////////////////////////////////////////////////////
+/// \brief Allocates an array of objects and returns it in a \p unique_ptr.
+///
+/// \tparam Type or class of the object.
+/// \return \p std::unique_ptr containing the array of objects.
+///////////////////////////////////////////////////////////////////////////////
 template<typename T>
 std::unique_ptr<T[]> make_unique( std::size_t count )
 {
     return std::unique_ptr<T[]>( new T[count]() );
 }
-/**************************************************************************//**
- * \brief <em>Unique smart pointer</em> implementation for CUDA memory.
- *
- * Functions largely in the same way as std::unique_ptr, but comes with 
- * automatic allocation and deallocation of CUDA memory upon construction and 
- * destruction. Also implements a few memory operations, such as copying to and 
- * from host memory and zeroing all data.
- *
- * \tparam Type or class of the object.
- *****************************************************************************/
+///////////////////////////////////////////////////////////////////////////////
+/// \brief <em>Unique smart pointer</em> implementation for CUDA memory.
+///
+/// Functions largely in the same way as std::unique_ptr, but comes with 
+/// automatic allocation and deallocation of CUDA memory upon construction and 
+/// destruction. Also implements a few memory operations, such as copying to 
+/// and from host memory and zeroing all data.
+///
+/// \tparam Type or class of the object.
+///////////////////////////////////////////////////////////////////////////////
 template <typename T>
 class DevPtr
 {
 public:
     /// Default constructor.
-    DevPtr(): _ptr( nullptr ), _bytes( 0 ), _device( -1 ) {}
-    /**********************************************************************//**
-     * \brief Constructor that allocates memory.
-     *
-     * \param[in] count Number of elements to be allocated.
-     * \param[in] device Which device the memory should be allocated on.
-     *                   Default value uses the currently active device.
-     *************************************************************************/
-    DevPtr( std::size_t count, int device = -1 ): _ptr( nullptr )
-                                                , _bytes( sizeof(T)*count )
+    DevPtr() throw(): _ptr( nullptr ), _bytes( 0 ), _device( 0 ) {}
+    ///////////////////////////////////////////////////////////////////////////
+    /// \brief Constructor that allocates memory.
+    ///
+    /// \throws Exception if CUDA reports an error. Tries to make sure that any 
+    ///                   memory that may have been allocated in this 
+    ///                   constructor is freed before throwing.
+    /// 
+    /// \param[in] count Number of elements to be allocated.
+    /// \param[in] device Which device the memory should be allocated on.
+    ///////////////////////////////////////////////////////////////////////////
+    DevPtr( std::size_t count, int device )
+          : _ptr( nullptr ), _bytes( sizeof(T)*count ), _device( device )
     {
-        setDevice( device );
-        allocate();
+        try { allocate(); }
+        catch ( ... ) { GPU_ERRCHK( cudaFree( _ptr ) ); throw; }
     }
-    /**********************************************************************//**
-     * \brief Constructor that takes a pointer to already allocated memory.
-     *
-     * Make sure \p count and \p device are correct. If they aren't, CUDA will 
-     * likely crash when performing certain operations, such as copying or 
-     * unallocating the memory.
-     *
-     * \param[in] ptr Device pointer to allocated device memory.
-     * \param[in] count Number of elements that have been allocated.
-     * \param[in] device Which device the memory has been allocated on.
-     *                   Default value uses the currently active device.
-     *************************************************************************/
-    DevPtr( T * ptr, std::size_t count, int device = -1 )
-        : _ptr( ptr )
-        , _bytes( sizeof(T)*count )
+    ///////////////////////////////////////////////////////////////////////////
+    /// \brief Constructor that takes a pointer to already allocated memory.
+    ///
+    /// Make sure \p count and \p device are correct. If they aren't, CUDA will 
+    /// likely crash when performing certain operations, such as copying or 
+    /// unallocating the memory.
+    /// 
+    /// \param[in] ptr Device pointer to allocated device memory.
+    /// \param[in] count Number of elements that have been allocated.
+    /// \param[in] device Which device the memory has been allocated on.
+    ///////////////////////////////////////////////////////////////////////////
+    DevPtr( T * ptr, std::size_t count, int device ) throw()
+          : _ptr( ptr ), _bytes( sizeof(T)*count ), _device ( device )
     {
-        setDevice( device );
     }
-    /**********************************************************************//**
-     * \brief Move constructor.
-     *
-     * Simply swaps all data between \p this and \p rhs.
-     *
-     * \param[in,out] rhs The \p DevPtr which should be moved to \p this.
-     *************************************************************************/
-    DevPtr( DevPtr && rhs )
+    ///////////////////////////////////////////////////////////////////////////
+    /// \brief Move constructor.
+    ///
+    /// Simply swaps all data between \p this and \p rhs.
+    ///
+    /// \param[in,out] rhs The \p DevPtr which should be moved to \p this.
+    ///////////////////////////////////////////////////////////////////////////
+    DevPtr( DevPtr && rhs ) throw()
     {
         std::swap( _ptr, rhs._ptr );
         std::swap( _bytes, rhs._bytes );
         std::swap( _device, rhs._device );
     }
     /// Default destructor: Unallocates memory on card.
-    ~DevPtr() { unallocate(); }
-    /**********************************************************************//**
-     * \brief Move-assignment operator.
-     *
-     * Simply swaps all data between \p this and \p rhs.
-     *
-     * \param[in,out] rhs The \p DevPtr which should be moved to \p this.
-     *
-     * \return Reference to \p this.
-     *************************************************************************/
-    DevPtr & operator=( DevPtr && rhs )
+    ~DevPtr() throw()
+    {
+        try { unallocate(); } catch ( ... ) {}
+    }
+    ///////////////////////////////////////////////////////////////////////////
+    /// \brief Move-assignment operator.
+    ///
+    /// Simply swaps all data between \p this and \p rhs.
+    ///
+    /// \param[in,out] rhs The \p DevPtr which should be moved to \p this.
+    ///
+    /// \return Reference to \p this.
+    ///////////////////////////////////////////////////////////////////////////
+    DevPtr & operator=( DevPtr && rhs ) throw()
     {
         std::swap( _ptr, rhs._ptr );
         std::swap( _bytes, rhs._bytes );
@@ -288,123 +368,139 @@ public:
 
         return *this;
     }
-    /**********************************************************************//**
-     * \brief Copies contents to the given destination.
-     *
-     * Make sure the data allocated at \p dstPtr is large enough to fit the 
-     * data on the device.
-     *
-     * \param[in] dstPtr Pointer to memory on the host to where the data on 
-     *                   the device should be copied to.
-     *************************************************************************/
+    ///////////////////////////////////////////////////////////////////////////
+    /// \brief Copies contents to the given destination.
+    ///
+    /// Make sure the data allocated at \p dstPtr is large enough to fit the 
+    /// data on the device.
+    ///
+    /// \throws Exception if CUDA reports an error.
+    /// 
+    /// \param[in] dstPtr Pointer to memory on the host to where the data on 
+    ///                   the device should be copied to.
+    ///////////////////////////////////////////////////////////////////////////
     void copyTo( T * dstPtr )
     {
         int currentDevice = 0;
-        cudaGetDevice( &currentDevice );
+        GPU_ERRCHK( cudaGetDevice( &currentDevice ) );
         if ( _device != currentDevice )
         {
-            cudaSetDevice( _device );
-            cudaMemcpy( dstPtr
-                      , _ptr
-                      , _bytes
-                      , cudaMemcpyDeviceToHost );
-            cudaSetDevice( currentDevice );
+            GPU_ERRCHK( cudaSetDevice( _device ) );
+            GPU_ERRCHK( cudaMemcpy( dstPtr
+                                  , _ptr
+                                  , _bytes
+                                  , cudaMemcpyDeviceToHost ) );
+            GPU_ERRCHK( cudaSetDevice( currentDevice ) );
         }
         else
-            cudaMemcpy( dstPtr
-                      , _ptr
-                      , _bytes
-                      , cudaMemcpyDeviceToHost );
+            GPU_ERRCHK( cudaMemcpy( dstPtr
+                                  , _ptr
+                                  , _bytes
+                                  , cudaMemcpyDeviceToHost ) );
     }
-    /**********************************************************************//**
-     * \brief Copies contents from the given source.
-     *
-     * Make sure the data allocated at \p srcPtr is small enough to fit the 
-     * allocated memory this \p DevPtr has.
-     *
-     * \param[in] srcPtr Pointer to memory on the host from where the device 
-     *                   should copy.
-     *************************************************************************/
+    ///////////////////////////////////////////////////////////////////////////
+    /// \brief Copies contents from the given source.
+    ///
+    /// Make sure the data allocated at \p srcPtr is small enough to fit the 
+    /// allocated memory this \p DevPtr has.
+    ///
+    /// \throws Exception if CUDA reports an error.
+    ///
+    /// \param[in] srcPtr Pointer to memory on the host from where the device 
+    ///                   should copy.
+    ///////////////////////////////////////////////////////////////////////////
     void copyFrom( T * srcPtr )
     {
         int currentDevice = 0;
-        cudaGetDevice( &currentDevice );
+        GPU_ERRCHK( cudaGetDevice( &currentDevice ) );
         if ( _device != currentDevice )
         {
-            cudaSetDevice( _device );
-            cudaMemcpy( _ptr
-                      , srcPtr
-                      , _bytes
-                      , cudaMemcpyHostToDevice );
-            cudaSetDevice( currentDevice );
+            GPU_ERRCHK( cudaSetDevice( _device ) );
+            GPU_ERRCHK( cudaMemcpy( _ptr
+                                  , srcPtr
+                                  , _bytes
+                                  , cudaMemcpyHostToDevice ) );
+            GPU_ERRCHK( cudaSetDevice( currentDevice ) );
         }
         else
-            cudaMemcpy( _ptr
-                      , srcPtr
-                      , _bytes
-                      , cudaMemcpyHostToDevice );
+            GPU_ERRCHK( cudaMemcpy( _ptr
+                                  , srcPtr
+                                  , _bytes
+                                  , cudaMemcpyHostToDevice ) );
     }
-    /// Sets all bits to zero.
+    ///////////////////////////////////////////////////////////////////////////
+    /// \brief Sets all bits to zero.
+    ///
+    /// \throws Exception if CUDA reports an error.
+    ///////////////////////////////////////////////////////////////////////////
     void zero()
     {
         int currentDevice = 0;
-        cudaGetDevice( &currentDevice );
+        GPU_ERRCHK( cudaGetDevice( &currentDevice ) );
         if ( _device != currentDevice )
         {
-            cudaSetDevice( _device );
-            cudaMemset( _ptr, 0, _bytes );
-            cudaSetDevice( currentDevice );
+            GPU_ERRCHK( cudaSetDevice( _device ) );
+            GPU_ERRCHK( cudaMemset( _ptr, 0, _bytes ) );
+            GPU_ERRCHK( cudaSetDevice( currentDevice ) );
         }
         else
-            cudaMemset( _ptr, 0, _bytes );
+            GPU_ERRCHK( cudaMemset( _ptr, 0, _bytes ) );
     }
-    /// Unallocates the data and resets to default state.
+    ///////////////////////////////////////////////////////////////////////////
+    /// \brief Unallocates the data and resets to default state.
+    ///
+    /// \throws Exception if CUDA reports an error.
+    ///////////////////////////////////////////////////////////////////////////
     void reset() { unallocate(); }
-    /**********************************************************************//**
-     * \brief Unallocates the current memory and then allocates new memory with 
-     *        the given parameters.
-     *
-     * \param[in] count Number of elements that the new array should contain.
-     * \param[in] device Which device the memory should be allocated on.
-     *************************************************************************/
-    void reset( std::size_t count, int device = -1 )
+    ///////////////////////////////////////////////////////////////////////////
+    /// \brief Unallocates the current memory and then allocates new memory with 
+    ///        the given parameters.
+    ///
+    /// \throws Exception if CUDA reports an error.
+    /// 
+    /// \param[in] count Number of elements that the new array should contain.
+    /// \param[in] device Which device the memory should be allocated on.
+    ///////////////////////////////////////////////////////////////////////////
+    void reset( std::size_t count, int device )
     {
         unallocate();
 
         _bytes = sizeof(T) * count;
-        setDevice( device );
+        _device = device;
 
         allocate();
     }
-    /**********************************************************************//**
-     * \brief Unallocates the current memory and assigns a new pointer, which 
-     *        points to already allocated memory.
-     *
-     * Make sure \p count and \p device are correct. If they aren't, CUDA will 
-     * likely crash when performing certain operations, such as copying or 
-     * unallocating the memory.
-     *
-     * \param[in] ptr Pointer to already allocated memory.
-     * \param[in] count Number of elements that the allocated array contains.
-     * \param[in] device Which device the memory has been allocated on.
-     *************************************************************************/
-    void reset( T * ptr, std::size_t count, int device = -1 )
+    ///////////////////////////////////////////////////////////////////////////
+    /// \brief Unallocates the current memory and assigns a new pointer, which 
+    ///        points to already allocated memory.
+    ///
+    /// Make sure \p count and \p device are correct. If they aren't, CUDA will 
+    /// likely crash when performing certain operations, such as copying or 
+    /// unallocating the memory.
+    ///
+    /// \throws Exception if CUDA reports an error.
+    ///
+    /// \param[in] ptr Pointer to already allocated memory.
+    /// \param[in] count Number of elements that the allocated array contains.
+    /// \param[in] device Which device the memory has been allocated on.
+    ///////////////////////////////////////////////////////////////////////////
+    void reset( T * ptr, std::size_t count, int device )
     {
         unallocate();
 
         _bytes = sizeof(T) * count;
-        setDevice( device );
+        _device = device;
         _ptr = ptr;
     }
-    /**********************************************************************//**
-     * \brief Stops managing the memory on the device.
-     *
-     * Calling this function returns the pointer to device memory and prevents 
-     * the DevPtr from deallocating it.
-     *
-     * \return Pointer to the allocated device memory.
-     *************************************************************************/
-    T * release()
+    ///////////////////////////////////////////////////////////////////////////
+    /// \brief Stops managing the memory on the device.
+    ///
+    /// Calling this function returns the pointer to device memory and prevents 
+    /// the DevPtr from deallocating it.
+    ///
+    /// \return Pointer to the allocated device memory.
+    ///////////////////////////////////////////////////////////////////////////
+    T * release() throw()
     {
         T * result = _ptr;
 
@@ -412,78 +508,70 @@ public:
 
         return result;
     }
-    /**********************************************************************//**
-     * \brief Returns the pointer to device memory.
-     *
-     * \return Pointer to the allocated device memory.
-     *************************************************************************/
-    T * get() { return _ptr; } 
-    /**********************************************************************//**
-     * \brief Returns the pointer to device memory.
-     *
-     * \return Pointer to the allocated device memory.
-     *************************************************************************/
-    std::size_t bytes() { return _bytes; }
-    /**********************************************************************//**
-     * \brief Returns the pointer to device memory.
-     *
-     * \return Pointer to the allocated device memory.
-     *************************************************************************/
-    std::size_t size() { return _bytes / sizeof(T); }
+    ///////////////////////////////////////////////////////////////////////////
+    /// \brief Returns the pointer to device memory.
+    ///
+    /// \return Pointer to the allocated device memory.
+    ///////////////////////////////////////////////////////////////////////////
+    T * get() const throw() { return _ptr; } 
+    ///////////////////////////////////////////////////////////////////////////
+    /// \brief Returns the pointer to device memory.
+    ///
+    /// \return Pointer to the allocated device memory.
+    ///////////////////////////////////////////////////////////////////////////
+    std::size_t bytes() const throw() { return _bytes; }
+    ///////////////////////////////////////////////////////////////////////////
+    /// \brief Returns the pointer to device memory.
+    ///
+    /// \return Pointer to the allocated device memory.
+    ///////////////////////////////////////////////////////////////////////////
+    std::size_t size() const throw() { return _bytes / sizeof(T); }
 private:
     /// Disabled copy constructor.
-    DevPtr( const DevPtr & rhs ) {}
+    DevPtr( const DevPtr & rhs ) throw() {}
     /// Disabled copy assignment operator.
-    DevPtr & operator=( const DevPtr & rhs ) { return *this; }
-    /// Allocates memory on the device.
+    DevPtr & operator=( const DevPtr & rhs ) throw() { return *this; }
+    ///////////////////////////////////////////////////////////////////////////
+    /// \brief Allocates memory on the device.
+    ///
+    /// \throws Exception if CUDA reports an error.
+    ///////////////////////////////////////////////////////////////////////////
     void allocate()
     {
         int currentDevice = 0;
-        cudaGetDevice( &currentDevice );
+        GPU_ERRCHK( cudaGetDevice( &currentDevice ) );
         if ( _device != currentDevice )
         {
-            cudaSetDevice( _device );
-            cudaMalloc( &_ptr, _bytes );
-            cudaSetDevice( currentDevice );
+            GPU_ERRCHK( cudaSetDevice( _device ) );
+            GPU_ERRCHK( cudaMalloc( &_ptr, _bytes ) );
+            GPU_ERRCHK( cudaSetDevice( currentDevice ) );
         }
         else
-            cudaMalloc( &_ptr, _bytes );
+            GPU_ERRCHK( cudaMalloc( &_ptr, _bytes ) );
     }
-    /// Unallocates the memory that was allocated upon construction.
+    ///////////////////////////////////////////////////////////////////////////
+    /// \brief Unallocates the memory tied to this DevPtr.
+    ///
+    /// \throws Exception if CUDA reports an error.
+    ///////////////////////////////////////////////////////////////////////////
     void unallocate()
     {
         if ( _ptr == nullptr )
             return;
 
         int currentDevice;
-        cudaGetDevice( &currentDevice );
+        GPU_ERRCHK( cudaGetDevice( &currentDevice ) );
 
         if ( currentDevice != _device )
         {
-            cudaSetDevice( _device );
-            cudaFree( _ptr );
-            cudaSetDevice( currentDevice );
+            GPU_ERRCHK( cudaSetDevice( _device ) );
+            GPU_ERRCHK( cudaFree( _ptr ) );
+            GPU_ERRCHK( cudaSetDevice( currentDevice ) );
         }
         else
-            cudaFree( _ptr );
+            GPU_ERRCHK( cudaFree( _ptr ) );
 
         _ptr = nullptr;
-    }
-    /**********************************************************************//**
-     * \brief Initializes the device.
-     *
-     * If the given device id is negative, then this \p DevPtr is associated 
-     * with the currently active device. Otherwise, the given device id is 
-     * used.
-
-     * \param[in] device Which device id this \p DevPtr should use.
-     *************************************************************************/
-    void setDevice( int device )
-    {
-        if ( device < 0 )
-            cudaGetDevice( &_device );
-        else
-            _device = device;
     }
 
     T * _ptr;            ///< Device pointer.
@@ -491,12 +579,12 @@ private:
     int _device;         ///< Device id.
 };
 
-/**************************************************************************//**
- * \brief A container for all variables that need to be duplicated for each 
- * additional device used.
- *
- * \tparam Node type
- *****************************************************************************/
+///////////////////////////////////////////////////////////////////////////////
+/// \brief A container for all variables that need to be duplicated for each 
+/// additional device used.
+///
+/// \tparam Node type
+///////////////////////////////////////////////////////////////////////////////
 template <class Node>
 struct DevContext
 {
@@ -520,17 +608,21 @@ struct DevContext
     DevPtr<uint> workQueueTiles_gpu;	 ///< Work queue tile ids on GPU.
     DevPtr<uint> offsetBuffer_gpu;	     ///< Offset buffer on GPU.
     DevPtr<uint> tileList_gpu;	         ///< Compacted tile lsit tiles on GPU.
-    DevPtr<uint> tileOffsets_gpu;        /**< Compacted tile list offsets 
-                                              on GPU. */
+    DevPtr<uint> tileOffsets_gpu;        ///< \brief Compacted tile list  
+                                         ///<        offsets on GPU.
+                                         ///<
     DevPtr<VoxInt> voxels_gpu;		     ///< Voxel data as integers on GPU.
     DevPtr<Node> nodes_gpu;			     ///< Node data on GPU.
-    DevPtr<Node> nodesCopy_gpu;          /**< Copy of nodes used in 
-                                              slicing on GPU. */
+    DevPtr<Node> nodesCopy_gpu;          ///< \brief Copy of nodes used in 
+                                         ///<        slicing on GPU.
+                                         ///<
     DevPtr<bool> error_gpu;			     ///< Error boolean on GPU.
-    DevPtr<uint> triangleTypes_gpu;      /**< Triangle classification 
-                                              array on GPU. */
-    DevPtr<uint> sortedTriangles_gpu;    /**< Triangle ids sorted by 
-                                              classification on GPU. */
+    DevPtr<uint> triangleTypes_gpu;      ///< \brief Triangle classification 
+                                         ///<        array on GPU.
+                                         ///<
+    DevPtr<uint> sortedTriangles_gpu;    ///< \brief Triangle ids sorted by 
+                                         ///<        classification on GPU.
+                                         ///<
     
     // Host pointers.
     std::vector<uint> tileOverlaps;       ///< Tile overlaps on host.
@@ -542,20 +634,24 @@ struct DevContext
     bool error;                           ///< Error boolean on host.
 
     // Host variables.
-    /** \brief Minimum corner of the model's bounding box. 
-        
-        Matches exactly the voxelization space, meaning that there is no 
-        padding or anything extra that won't make it to the final 
-        voxelization. */
+
+    ///< \brief Minimum corner of the model's bounding box. 
+    ///<
+    ///< Matches exactly the voxelization space, meaning that there is no 
+    ///< padding or anything extra that won't make it to the final 
+    ///< voxelization.
+    ///<
     double3		  minVertex;
-    /** \brief Extended minimum corner of the model's bounding box. 
-               
-        If there is a neighboring subspace to the left or below, then this 
-        differs from minVertex. The extension also happens during slicing. */
+    ///< \brief Extended minimum corner of the model's bounding box. 
+    ///<
+    ///< If there is a neighboring subspace to the left or below, then this 
+    ///< differs from minVertex. The extension also happens during slicing.
+    ///<
     double3       extMinVertex;
     uint		  workQueueSize;            ///< Size of the work queue.
-    uint		  maxWorkQueueSize;         /**< \brief How much is allocated 
-                                                        for the work queue. */
+    uint		  maxWorkQueueSize;         ///< \brief How much is allocated 
+                                            ///<        for the work queue.
+                                            ///<
     /// Which triangle is the first to have non-zero overlapping tiles.
     int			  firstTriangleWithTiles;
     /// Essentially the size of the compacted tile list.
@@ -575,13 +671,15 @@ struct DevContext
     bool          down;     ///< If there is a subspace below.
 
 private:
-    DevContext( const DevContext & rhs ) {}
-    DevContext & operator=( const DevContext & rhs ) { return *this; }
+    /// Disabled copy constructor.
+    DevContext( const DevContext & rhs ) throw() {}
+    /// Disabled copy assignment operator.
+    DevContext & operator=( const DevContext & rhs ) throw() { return *this; }
 };
-/**************************************************************************//**
- * \brief A container for many variables that don't need their own versions for 
- *        each device.
- *****************************************************************************/
+///////////////////////////////////////////////////////////////////////////////
+/// \brief A container for many variables that don't need their own versions 
+///        for each device.
+///////////////////////////////////////////////////////////////////////////////
 struct HostContext
 {
     std::vector<float> vertices;  ///< Vertices of the model.
@@ -597,6 +695,7 @@ struct HostContext
     Bounds<uint3> resolution;           ///< Dimensions of the voxelization.
 
     // Surface voxelization data.
+
     uint		  start1DTris;          ///< Index where 1D Triangles start.
     uint		  end1DTris;            ///< Index where 1D Triangles end.
     uint		  start2DTris;          ///< Index where 2D Triangles start.
@@ -606,5 +705,3 @@ struct HostContext
 };
 
 } // End namespace vox
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef _VOX_GLOB_FUNCS_H_
-#define _VOX_GLOB_FUNCS_H_
+#pragma once
 
 #include "aux_definitions.h"
 #include <cuda.h>
@@ -96,7 +95,6 @@ void restoreRotatedNodes( DevContext<Node>          & devContext,
                           Bounds<uint2> const & yzSubSpace,
                           clock_t               startTime,
                           bool                  verbose );
-void checkCudaErrors( std::string loc );
 
 // Solid voxelization kernels and device functions.
 
@@ -254,5 +252,3 @@ void dummyFunction();
 void masterDummyFunction();
 
 } // End namespace vox
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef _VOX_DEV_FUNCS_H_
-#define _VOX_DEV_FUNCS_H_
+#pragma once
 
 #include "aux_definitions.h"
 #include "node_types.h"
@@ -775,5 +774,3 @@ inline __host__ __device__
                        , a.x*b.y - a.y*b.x ); 
 }
 #endif // _DOUBLE2_DOUBLE3_MATH_
-
-#endif // _VOX_DEV_FUNCS_H_
