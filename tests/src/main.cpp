@@ -431,7 +431,7 @@ int main(int argc, char** argv)
         initTests<vox::ShortNode>( vm, polys );
     }
 
-    // testFunction();
+    testFunction();
 
     return 0;
 }
@@ -1921,52 +1921,9 @@ void performAllSliceTest
 
 void testFunction()
 {
-    std::vector<TestClass> vec;
-    vec.reserve( 3 );
+    std::cout << "Entering test function.\n";
 
-    std::cout << "Push_back:\n";
-    vec.push_back( TestClass( 1 ) );
-
-    std::cout << "Push_back:\n";
-    vec.push_back( TestClass( 2 ) );
-
-    std::cout << "Emplace_back:\n";
-    vec.emplace_back( 3 );
-
-    std::cout << "Allocate:\n";
-    auto ptr = std::unique_ptr<TestClass>( new TestClass( 4 ) );
-
-    vec.push_back( *ptr );
-
-    std::cout << "Printing values:\n";
-    std::for_each( vec.begin()
-                 , vec.end()
-                 , [] ( TestClass & t ) { std::cout << t.get() << "\n"; } );
-
-    std::cout << ptr->get() << "\n";
-
-    std::vector<TestClass> vec2;
-    vec2.push_back( TestClass( 5 ) );
-    vec2.push_back( TestClass( 6 ) );
-    vec2.push_back( TestClass( 7 ) );
-
-    std::cout << "Assigning vec2 to vec.\n";
-
-    vec = vec2;
-
-    std::for_each( vec.begin()
-                 , vec.end()
-                 , [] ( TestClass & t ) { std::cout << t.get() << "\n"; } );
-
-    auto jack = std::unique_ptr<Printable>( new Person( "Jack" ) );
-    auto jill = std::unique_ptr<Printable>( new Person( "Jill" ) );
-    auto ride = std::unique_ptr<Printable>( new Car( "Opel Astra" ) );
-
-    std::cout << jack->print();
-    std::cout << jill->print();
-    std::cout << ride->print();
-
-    std::cout << "Exiting function.\n";
+    std::cout << "Exiting test function.\n";
 }
 
 inline std::string printUint3( uint3 & vec )
