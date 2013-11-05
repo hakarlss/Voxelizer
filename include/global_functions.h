@@ -1,9 +1,10 @@
 #pragma once
 
-#include "aux_definitions.h"
+#include "clean_defs.h"
 #include <cuda.h>
 
 namespace vox {
+
 
 /// Sorts the work queue by tile id.
 template <class Node>

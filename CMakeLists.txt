@@ -38,6 +38,11 @@ option( GENERATE_TESTS "Adds the compilation of a test program as a target." OFF
 set( CMAKE_DEBUG_POSTFIX "_d" )
 set( CUDA_NVCC_FLAGS_RELEASE ${CUDA_NVCC_FLAGS_RELEASE};-gencode arch=compute_30,code=sm_30 )
 set( CUDA_NVCC_FLAGS_DEBUG ${CUDA_NVCC_FLAGS_DEBUG};-gencode arch=compute_30,code=sm_30 )
+
+# C++ compiler flags
+set( CMAKE_CXX_FLAGS_RELEASE "-std=c++0x ${CMAKE_CXX_FLAGS_RELEASE}" )
+
+message( STATUS "R Flags: ${CMAKE_CXX_FLAGS_RELEASE}" )
 	
 # Include files from the subdirectories and process the CMakeLists.txt in those 
 # directories.

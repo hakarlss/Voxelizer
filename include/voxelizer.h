@@ -677,7 +677,7 @@ struct NodePointer {
 
     /// Default constructor.
     NodePointer() throw()
-        : ptr(nullptr), dev(0), dim(make_uint3(0)), loc(make_uint3(0)) {};
+        : ptr(NULL), dev(0), dim(make_uint3(0)), loc(make_uint3(0)) {};
 };
 
 ///////////////////////////////////////////////////////////////////////////////
