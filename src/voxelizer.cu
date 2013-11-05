@@ -36,7 +36,9 @@ namespace vox {
 /// \param[in] verbose Whether or not to print what is being done.
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node> void sortWorkQueue(
-    DevContext<Node> & devContext, 
+    uint * workQueueTriangles_gpu,
+    uint * workQueueTiles_gpu,
+    uint workQueueSize,
     clock_t	     startTime, 
     bool		 verbose )
 {
@@ -44,11 +46,11 @@ template <class Node> void sortWorkQueue(
         std::cout << (clock() - startTime) << ": Calling sortWorkQueue.\n";
 
     thrust::device_ptr<uint> wqtri = thrust::device_pointer_cast<uint>(
-        devContext.workQueueTriangles_gpu.get() );
+        workQueueTriangles_gpu );
     thrust::device_ptr<uint> wqtil = thrust::device_pointer_cast<uint>(
-        devContext.workQueueTiles_gpu.get() );
+        workQueueTiles_gpu );
 
-    thrust::sort_by_key( wqtil, wqtil + devContext.workQueueSize, wqtri );
+    thrust::sort_by_key( wqtil, wqtil + workQueueSize, wqtri );
 
     checkCudaErrors( "sortWorkQueue" );
 }
@@ -69,7 +71,12 @@ template <class Node> void sortWorkQueue(
 /// \param[in] verbose Whether or not to print what is being done.
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node> void compactWorkQueue(
-    DevContext<Node> & devContext, 
+    uint * workQueueTiles_gpu,
+    uint * tileList_gpu,
+    uint * tileOffsets_gpu,
+    uint maxWorkQueueSize,
+    uint workQueueSize,
+    uint & nrOfValidElements,
     clock_t		 startTime, 
     bool		 verbose )
 {
@@ -77,24 +84,24 @@ template <class Node> void compactWorkQueue(
         std::cout << (clock() - startTime) << ": Calling compactWorkQueue.\n";
 
     thrust::device_ptr<uint> wqtil = 
-        thrust::device_pointer_cast<uint>(devContext.workQueueTiles_gpu.get());
+        thrust::device_pointer_cast<uint>(workQueueTiles_gpu);
     thrust::device_ptr<uint> iv;
     thrust::pair<thrust::device_ptr<uint>, thrust::device_ptr<uint>> ne;
     thrust::device_ptr<uint> tl;
     thrust::device_ptr<uint> to;
 
-    tl = thrust::device_pointer_cast(devContext.tileList_gpu.get());
-    to = thrust::device_pointer_cast(devContext.tileOffsets_gpu.get());
-    iv = thrust::device_malloc<uint>(devContext.maxWorkQueueSize);
-    thrust::sequence(iv, iv + devContext.maxWorkQueueSize, 0, 1);
+    tl = thrust::device_pointer_cast(tileList_gpu);
+    to = thrust::device_pointer_cast(tileOffsets_gpu);
+    iv = thrust::device_malloc<uint>(maxWorkQueueSize);
+    thrust::sequence(iv, iv + maxWorkQueueSize, 0, 1);
 
     ne = thrust::unique_by_key_copy( wqtil, 
-                                     wqtil + devContext.workQueueSize, 
+                                     wqtil + workQueueSize, 
                                      iv, 
                                      tl, 
                                      to );
 
-    devContext.nrValidElements = uint( ne.first - tl );
+    nrValidElements = uint( ne.first - tl );
 
     // devContext.tileList_gpu = thrust::raw_pointer_cast(tl);
     // devContext.tileOffsets_gpu = thrust::raw_pointer_cast(to);
@@ -121,15 +128,19 @@ template <class Node> void compactWorkQueue(
 /// \param[in] verbose Whether or not to print what is being done.
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node> void calcTileOverlap(
-    DevContext<Node>		    & devContext, 
-    HostContext   const & hostContext, 
+    uint blocks,
+    uint threadsPerBlock,
+    float * vertices_gpu,
+    uint * indices_gpu,
+    uint tileOverlaps_gpu,
+    uint nrOfTriangles,
+    double3 extMinVertex,
+    double voxelLength,
+    Bounds<uint3> extResolution,
     Bounds<uint2> const & yzSubSpace, 
     clock_t				  startTime, 
     bool				  verbose )
 {
-    uint blocks = devContext.blocks;
-    uint threadsPerBlock = devContext.threads;
-
     if (verbose) 
         std::cout << (clock() - startTime) << ": Calling calculateTileOverlap"
                      "<<<" << blocks << ", " << threadsPerBlock << ">>> (" << 
@@ -166,15 +177,22 @@ template <class Node> void calcTileOverlap(
 /// \param[in] verbose Whether or not to print what is being done.
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node> void calcWorkQueue(
-    DevContext<Node>		    & devContext, 
-    HostContext   const & hostContext, 
+    uint blocks,
+    uint threadsPerBlock,
+    float * vertices_gpu,
+    uint * indices_gpu,
+    uint * workQueueTriangles_gpu,
+    uint * workQueueTiles_gpu,
+    uint * offsetBuffer_gpu,
+    uint nrOfTriangles,
+    double3 extMinVertex,
+    int firstTriangleWithTiles,
+    double voxelLength,
+    Bounds<uint3> extResolution,
     Bounds<uint2> const & yzSubSpace,
     clock_t				  startTime, 
     bool				  verbose )
 {
-    uint blocks = devContext.blocks;
-    uint threadsPerBlock = devContext.threads;
-
     if (verbose) 
         std::cout << (clock() - startTime) << ": Calling constructWorkQueue"
                      "<<<" << blocks << ", " << threadsPerBlock << ">>> (" << 
@@ -214,8 +232,22 @@ template <class Node> void calcWorkQueue(
 /// \param[in] verbose Whether or not to print what is being done.
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node> void calcVoxelization(
-    DevContext<Node>		    & devContext, 
-    HostContext   const & hostContext, 
+    float * vertices_gpu,
+    uint * indices_gpu,
+    uint * workQueueTriangles_gpu,
+    uint * workQueueTiles_gpu,
+    uint * tileList_gpu,
+    uint * tileOffsets_gpu,
+    VoxInt * voxels_gpu,
+    uint nrOfTriangles,
+    uint workQueueSize,
+    double3 extMinVertex,
+    double voxelLength,
+    bool left,
+    bool right,
+    bool up,
+    bool down,
+    Bounds<uint3> extResolution,
     Bounds<uint3> const & subSpace, 
     clock_t				  startTime, 
     bool				  verbose )
@@ -267,12 +299,15 @@ template <class Node> void calcVoxelization(
 /// \param[in] verbose Whether or not to print what is being done.
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node> void calcNodeList(
-    DevContext<Node>    & devContext, 
+    uint blocks,
+    uint threads,
+    VoxInt * voxels_gpu,
+    Node * nodes_gpu,
+    Bounds<uint3> allocResolution,
     Bounds<uint2> const & yzSubSpace, 
     clock_t				  startTime, 
     bool				  verbose )
 {
-    uint blocks = devContext.blocks;
     dim3 threadsPerBlock( devContext.threads >> VOX_DIV, 32 );
 
     if (verbose) 

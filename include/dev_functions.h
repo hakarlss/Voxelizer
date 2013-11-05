@@ -1,6 +1,6 @@
 #pragma once
 
-#include "aux_definitions.h"
+#include "clean_defs.h"
 #include "node_types.h"
 #include <cuda.h>
 
