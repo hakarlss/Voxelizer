@@ -1,3 +1,5 @@
+#pragma once
+
 #if !defined(_VOXELIZER_UTILS_H_)
 #define _VOXELIZER_UTILS_H_
 
