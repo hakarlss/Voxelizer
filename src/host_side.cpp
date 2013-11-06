@@ -31,6 +31,8 @@ template <class Node> Voxelizer<Node>::Voxelizer(
     const uint  * _indices, 
     uint		  _nrOfVertices, 
     uint		  _nrOfTriangles ): defaultDevice(0)
+                                  , hostVars(CommonHostData())
+                                  , options(Options())
 {
     this->hostVars.nrOfVertices = _nrOfVertices;
     this->hostVars.nrOfTriangles = _nrOfTriangles;
@@ -39,9 +41,9 @@ template <class Node> Voxelizer<Node>::Voxelizer(
 
     // Copy the arrays to own memory so as to not be reliant on their
     // possibly fickle existence.
-    this->hostVars.vertices = 
+    this->vertices = 
         std::vector<float>( _vertices, _vertices + 3*_nrOfVertices );
-    this->hostVars.indices = 
+    this->indices = 
         std::vector<uint>( _indices, _indices + 3*_nrOfTriangles );
 
     this->calculateBoundingBox();
@@ -72,8 +74,22 @@ template <class Node> Voxelizer<Node>::Voxelizer(
     uint		 _nrOfVertices, 
     uint		 _nrOfTriangles, 
     uint		 _nrOfUniqueMaterials ): defaultDevice(0)
+                                       , hostVars(CommonHostData())
+                                       , options(Options())
 {
-    Voxelizer( _vertices, _indices, _nrOfVertices, _nrOfTriangles );
+    this->hostVars.nrOfVertices = _nrOfVertices;
+    this->hostVars.nrOfTriangles = _nrOfTriangles;
+
+    this->initVariables();
+
+    // Copy the arrays to own memory so as to not be reliant on their
+    // possibly fickle existence.
+    this->vertices = 
+        std::vector<float>( _vertices, _vertices + 3*_nrOfVertices );
+    this->indices = 
+        std::vector<uint>( _indices, _indices + 3*_nrOfTriangles );
+
+    this->calculateBoundingBox();
 
     this->setMaterials( _materials, _nrOfUniqueMaterials );
 }
@@ -113,8 +129,7 @@ void Voxelizer<Node>::deallocate()
 /// \param[in] device The device this function applies to.
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node>
-void Voxelizer<Node>::deallocateVoxelizationData( 
-    DevContext<Node> & device )
+void Voxelizer<Node>::deallocateVoxelizationData( DevContext<Node> & device )
 {
     // Calling reset() on the DevPtr-class causes its destructor to free the 
     // allocated device memory.
@@ -170,14 +185,15 @@ void Voxelizer<Node>::initDevices( uint nrOfUsedDevices )
 
         this->devices[d].reset( new DevContext<Node>() );
 
-        this->devices[d]->dev = dev;
+        this->devices[d]->data.dev = dev;
 
-        cudaGetDeviceProperties( &this->devices[d]->devProps, 0 );
-        cudaMemGetInfo( &this->devices[d]->freeMem, &this->devices[d]->maxMem );
+        cudaGetDeviceProperties( &this->devices[d]->data.devProps, 0 );
+        cudaMemGetInfo( &this->devices[d]->data.freeMem
+                      , &this->devices[d]->data.maxMem );
         
         // Blocks and threads are currently not optimized per device.
-        this->devices[d]->blocks = 64;
-        this->devices[d]->threads = 512;
+        this->devices[d]->data.blocks = 64;
+        this->devices[d]->data.threads = 512;
 
         checkCudaErrors( "initDevices" );
     }
@@ -211,7 +227,7 @@ void Voxelizer<Node>::setMaterials(
     this->hostVars.nrOfUniqueMaterials = _nrOfUniqueMaterials;
 
     // Copy over the materials into a local copy.
-    this->hostVars.materials = 
+    this->materials = 
         std::vector<uchar>( _materials
                           , _materials + this->hostVars.nrOfTriangles );
 
@@ -261,15 +277,18 @@ void Voxelizer<Node>::performVoxelization(
     DevContext<Node>    & device )
 {
     // Initialize values here, since the function may be called successively.
-    device.workQueueSize = 0;
-    device.firstTriangleWithTiles = -1;
+    device.data.workQueueSize = 0;
+    device.data.firstTriangleWithTiles = -1;
 
     if (this->options.printing) this->printGeneralInfo( device );
 
     // Process triangles in parallel, and determine the number of tiles 
     // overlapping each triangle.
-    calcTileOverlap( device, 
+    calcTileOverlap( device.data,
                      this->hostVars, 
+                     device.vertices_gpu.get(),
+                     device.indices_gpu.get(),
+                     device.tileOverlaps_gpu.get(),
                      yzSubSpace,
                      this->startTime, 
                      this->options.verbose );
@@ -281,7 +300,7 @@ void Voxelizer<Node>::performVoxelization(
     this->prepareForConstructWorkQueue( device );
 
     // There's nothing to voxelize if the work queue will be empty.
-    if (device.workQueueSize == 0)
+    if (device.data.workQueueSize == 0)
         return;
 
     // Reuse previously allocated memory if the new data fits.
@@ -296,8 +315,13 @@ void Voxelizer<Node>::performVoxelization(
     if (this->options.printing) this->printOffsetBuffer( device, xAxis );
 
     // Process triangles in parallel, and construct the work queue.
-    calcWorkQueue( device, 
+    calcWorkQueue( device.data, 
                    this->hostVars, 
+                   device.vertices_gpu.get(),
+                   device.indices_gpu.get(),
+                   device.workQueueTriangles_gpu.get(),
+                   device.workQueueTiles_gpu.get(),
+                   device.offsetBuffer_gpu.get(),
                    yzSubSpace, 
                    this->startTime, 
                    this->options.verbose );
@@ -312,7 +336,9 @@ void Voxelizer<Node>::performVoxelization(
     }
 
     // Sort the work queue by tile, instead of by triangle.
-    sortWorkQueue( device, 
+    sortWorkQueue( device.data,
+                   device.workQueueTriangles_gpu.get(),
+                   device.workQueueTiles_gpu.get(),
                    this->startTime, 
                    this->options.verbose );
 
@@ -327,7 +353,10 @@ void Voxelizer<Node>::performVoxelization(
 
     // Compact the work queue so that each tile only appears once and has 
     // an offset into the work queue where the tile's data begins.
-    compactWorkQueue( device, 
+    compactWorkQueue( device.data,
+                      device.workQueueTiles_gpu.get(),
+                      device.tileList_gpu.get(),
+                      device.tileOffsets_gpu.get(),
                       this->startTime, 
                       this->options.verbose );
 
@@ -350,8 +379,15 @@ void Voxelizer<Node>::performVoxelization(
                                  , yzSubSpace.max.x
                                  , yzSubSpace.max.y );
 
-        calcVoxelization( device, 
+        calcVoxelization( device.data, 
                           this->hostVars, 
+                          device.vertices_gpu.get(),
+                          device.indices_gpu.get(),
+                          device.workQueueTriangles_gpu.get(),
+                          device.workQueueTiles_gpu.get(),
+                          device.tileList_gpu.get(),
+                          device.tileOffsets_gpu.get(),
+                          device.voxels_gpu.get(),
                           subSpace, 
                           this->startTime, 
                           this->options.verbose );
@@ -370,7 +406,8 @@ template <class Node>
 void Voxelizer<Node>::allocStaticMem( DevContext<Node> & device )
 {
     // Calculates the allocated dimensions from the bounding box.
-    uint3 res = device.allocResolution.max - device.allocResolution.min;
+    uint3 res = 
+        device.data.allocResolution.max - device.data.allocResolution.min;
 
     uint nrOfNodes = 0;
 
@@ -386,18 +423,18 @@ void Voxelizer<Node>::allocStaticMem( DevContext<Node> & device )
     // voxelizing along the other directions.
     if ( this->options.slices && this->options.sliceDirection == 0 && 
          this->options.nodeOutput )
-         device.nodesCopy_gpu.reset( nrOfNodes, device.dev );
+         device.nodesCopy_gpu.reset( nrOfNodes, device.data.dev );
 
     // Allocate nodes if we are to produce an array of nodes as output.
     if ( this->options.nodeOutput )
-        device.nodes_gpu.reset( nrOfNodes, device.dev );
+        device.nodes_gpu.reset( nrOfNodes, device.data.dev );
 
     // VOX_DIV depends on the size of the integers on the sytem.
     // Currently essentially divides by 32, regardless of architecture.
     uint nrOfVoxelInts = ( res.x * res.y * res.z ) >> VOX_DIV;
 
     // Allocate memory for the voxels on the selected device.
-    device.voxels_gpu.reset( nrOfVoxelInts, device.dev );
+    device.voxels_gpu.reset( nrOfVoxelInts, device.data.dev );
 
     // Make all integers in the voxel array zero.
     device.voxels_gpu.zero();
@@ -405,31 +442,36 @@ void Voxelizer<Node>::allocStaticMem( DevContext<Node> & device )
     // Allocates various memory only used when calculating materials.
     if ( this->options.materials )
     {
-        device.materials_gpu.reset( this->hostVars.nrOfTriangles, device.dev );
+        device.materials_gpu.reset( this->hostVars.nrOfTriangles
+                                  , device.data.dev );
 
-        device.materials_gpu.copyFrom( this->hostVars.materials.data() );
+        device.materials_gpu.copyFrom( this->materials.data() );
 
         device.triangleTypes_gpu.reset( this->hostVars.nrOfTriangles
-                                      , device.dev );
+                                      , device.data.dev );
 
         device.triangleTypes_gpu.zero();
 
         device.sortedTriangles_gpu.reset( this->hostVars.nrOfTriangles
-                                        , device.dev );
+                                        , device.data.dev );
     }
 
     // Allocate space for various data structures.
-    device.vertices_gpu.reset( 3 * this->hostVars.nrOfVertices, device.dev );
+    device.vertices_gpu.reset( 3 * this->hostVars.nrOfVertices
+                             , device.data.dev );
 
-    device.indices_gpu.reset( 3 * this->hostVars.nrOfTriangles, device.dev );
+    device.indices_gpu.reset( 3 * this->hostVars.nrOfTriangles
+                            , device.data.dev );
 
-    device.tileOverlaps_gpu.reset( this->hostVars.nrOfTriangles, device.dev );
+    device.tileOverlaps_gpu.reset( this->hostVars.nrOfTriangles
+                                 , device.data.dev );
 
-    device.offsetBuffer_gpu.reset( this->hostVars.nrOfTriangles, device.dev );
+    device.offsetBuffer_gpu.reset( this->hostVars.nrOfTriangles
+                                 , device.data.dev );
 
-    device.vertices_gpu.copyFrom( this->hostVars.vertices.data() );
+    device.vertices_gpu.copyFrom( this->vertices.data() );
 
-    device.indices_gpu.copyFrom( this->hostVars.indices.data() );
+    device.indices_gpu.copyFrom( this->indices.data() );
 
     device.tileOverlaps.reserve( this->hostVars.nrOfTriangles );
     
@@ -455,34 +497,37 @@ void Voxelizer<Node>::reAllocDynamicMem(
 {
     // Most of the allocations depend on the workQueueSize. MaxWorkQueueSize
     // is the current workQueueSize.
-    if ( device.workQueueSize <= device.maxWorkQueueSize )
+    if ( device.data.workQueueSize <= device.data.maxWorkQueueSize )
         return;
     else
     {
-        device.maxWorkQueueSize = 
-            uint( multiplier * float( device.workQueueSize ) );
+        device.data.maxWorkQueueSize = 
+            uint( multiplier * float( device.data.workQueueSize ) );
     }
 
     // Reallocate memory.
-    device.workQueueTriangles_gpu.reset( device.maxWorkQueueSize, device.dev );
+    device.workQueueTriangles_gpu.reset( device.data.maxWorkQueueSize
+                                       , device.data.dev );
 
-    device.workQueueTiles_gpu.reset( device.maxWorkQueueSize, device.dev );
+    device.workQueueTiles_gpu.reset( device.data.maxWorkQueueSize
+                                   , device.data.dev );
 
-    device.tileList_gpu.reset( device.maxWorkQueueSize, device.dev );
+    device.tileList_gpu.reset( device.data.maxWorkQueueSize, device.data.dev );
 
-    device.tileOffsets_gpu.reset( device.maxWorkQueueSize, device.dev );
+    device.tileOffsets_gpu.reset( device.data.maxWorkQueueSize
+                                , device.data.dev );
 
-    device.workQueueTriangles.reserve( device.maxWorkQueueSize );
+    device.workQueueTriangles.reserve( device.data.maxWorkQueueSize );
 
-    device.workQueueTiles.reserve( device.maxWorkQueueSize );
+    device.workQueueTiles.reserve( device.data.maxWorkQueueSize );
 
-    device.tileList.reserve( device.maxWorkQueueSize );
+    device.tileList.reserve( device.data.maxWorkQueueSize );
 
-    device.tileOffsets.reserve( device.maxWorkQueueSize );
+    device.tileOffsets.reserve( device.data.maxWorkQueueSize );
 
     if (this->options.verbose) 
         std::cout << "Allocated work queue size = " << 
-        device.maxWorkQueueSize << "\n";
+        device.data.maxWorkQueueSize << "\n";
 }
 ///////////////////////////////////////////////////////////////////////////////
 /// Produces a plain, integer-voxelization given the supplied parameters.
@@ -745,19 +790,19 @@ void Voxelizer<Node>::voxelizeEntry(
             int y = i % deviceConfig.x;
             int z = i / deviceConfig.x;
 
-            this->devices[i]->location = make_uint3( 0, y, z );
+            this->devices[i]->data.location = make_uint3( 0, y, z );
 
-            this->devices[i]->resolution = parts[i];
+            this->devices[i]->data.resolution = parts[i];
 
             // Also update the minimum corners to reflect the new bounding box.
-            this->devices[i]->minVertex.x = this->hostVars.minVertex.x + 
-                double(this->devices[i]->resolution.min.x) * 
+            this->devices[i]->data.minVertex.x = this->hostVars.minVertex.x + 
+                double(this->devices[i]->data.resolution.min.x) * 
                 this->hostVars.voxelLength;
-            this->devices[i]->minVertex.y = this->hostVars.minVertex.y + 
-                double(this->devices[i]->resolution.min.y) * 
+            this->devices[i]->data.minVertex.y = this->hostVars.minVertex.y + 
+                double(this->devices[i]->data.resolution.min.y) * 
                 this->hostVars.voxelLength;
-            this->devices[i]->minVertex.z = this->hostVars.minVertex.z + 
-                double(this->devices[i]->resolution.min.z) * 
+            this->devices[i]->data.minVertex.z = this->hostVars.minVertex.z + 
+                double(this->devices[i]->data.resolution.min.z) * 
                 this->hostVars.voxelLength;
         }
     }
@@ -841,55 +886,55 @@ void Voxelizer<Node>::voxelizeWorker(
     DevContext<Node> & device )
 {
     // All processing in this thread will use this device.
-    cudaSetDevice( device.dev );
+    cudaSetDevice( device.data.dev );
 
     // The left, right, up and down bools tell if, in a multidevice
     // environment, some other device is voxelizing a subspace that is 
     // adjacent to this device's subspace in the given direction. Since each 
     // device voxelizes the entire x-direction, each device can only have at 
     // most 4 neighboring subspaces.
-    device.left = false;
-    device.right = false;
-    device.up = false;
-    device.down = false;
+    device.data.left = false;
+    device.data.right = false;
+    device.data.up = false;
+    device.data.down = false;
 
     // Rename to a shorter name.
-    Bounds<uint3> partition = device.resolution;
+    Bounds<uint3> partition = device.data.resolution;
     uint3 res = partition.max - partition.min; // Dimensions of the box.
 
     // Determine subspace neighborhoods.
     if ( partition.min.y == this->hostVars.resolution.min.y && 
          partition.max.y != this->hostVars.resolution.max.y )
-        device.right = true;
+        device.data.right = true;
     else if ( partition.max.y == this->hostVars.resolution.max.y && 
               partition.min.y != this->hostVars.resolution.min.y )
-        device.left = true;
+        device.data.left = true;
     else if ( partition.min.y != this->hostVars.resolution.min.y && 
               partition.max.y != this->hostVars.resolution.max.y ) 
     {
-        device.left = true;
-        device.right = true;
+        device.data.left = true;
+        device.data.right = true;
     }
 
     if ( partition.min.z == this->hostVars.resolution.min.z && 
          partition.max.z != this->hostVars.resolution.max.z )
-        device.up = true;
+        device.data.up = true;
     else if ( partition.max.z == this->hostVars.resolution.max.z && 
               partition.min.z != this->hostVars.resolution.min.z )
-        device.down = true;
+        device.data.down = true;
     else if ( partition.min.z != this->hostVars.resolution.min.z && 
               partition.max.z != this->hostVars.resolution.max.z ) 
     {
-        device.down = true;
-        device.up = true;
+        device.data.down = true;
+        device.data.up = true;
     }
 
     // Insert padding to get the correct allocation size.
-    device.allocResolution = device.resolution;
+    device.data.allocResolution = device.data.resolution;
 
     // Padding or extension.
-    device.allocResolution.max.y += 2;
-    device.allocResolution.max.z += 2;
+    device.data.allocResolution.max.y += 2;
+    device.data.allocResolution.max.z += 2;
 
     // Allocate memory, except when slices are enabled and the allocation
     // has already been performed.
@@ -899,8 +944,8 @@ void Voxelizer<Node>::voxelizeWorker(
     else {
         // When using slicing and the first slice has been calculated, some 
         // data needs to be reset in order for everything to work currectly.
-        uint3 dim = device.allocResolution.max - 
-                    device.allocResolution.min;
+        uint3 dim = device.data.allocResolution.max - 
+                    device.data.allocResolution.min;
         if ( this->options.materials )
             device.triangleTypes_gpu.zero();
 
@@ -910,15 +955,15 @@ void Voxelizer<Node>::voxelizeWorker(
         // reallocate these.
         uint nrOfNodes = dim.x * dim.y * dim.z;
         if ( this->options.sliceDirection == 0 ) {
-            device.nodesCopy_gpu = DevPtr<Node>( nrOfNodes, device.dev );
+            device.nodesCopy_gpu = DevPtr<Node>( nrOfNodes, device.data.dev );
         }
         else
         {
-            device.nodes_gpu = DevPtr<Node>( nrOfNodes, device.dev );
+            device.nodes_gpu = DevPtr<Node>( nrOfNodes, device.data.dev );
         }
     }
 
-    device.maxWorkQueueSize = 0;
+    device.data.maxWorkQueueSize = 0;
 
     // The extended partition will be a space much like the original voxel 
     // space, but extended in the directions it has neighboring subspaces. 
@@ -931,13 +976,13 @@ void Voxelizer<Node>::voxelizeWorker(
         make_uint3( partition.max.x, partition.max.y, partition.max.z )
     };
 
-    extPartition.min.y -= device.left ? 1 : 0;
-    extPartition.min.z -= device.down ? 1 : 0;
-    extPartition.max.y += device.right ? 1 : 0;
-    extPartition.max.z += device.up ? 1 : 0;
+    extPartition.min.y -= device.data.left ? 1 : 0;
+    extPartition.min.z -= device.data.down ? 1 : 0;
+    extPartition.max.y += device.data.right ? 1 : 0;
+    extPartition.max.z += device.data.up ? 1 : 0;
 
     // Update minimum bounds.
-    device.extMinVertex = make_double3(
+    device.data.extMinVertex = make_double3(
         this->hostVars.minVertex.x + double(extPartition.min.x) * 
             this->hostVars.voxelLength,
         this->hostVars.minVertex.y + double(extPartition.min.y) * 
@@ -953,13 +998,13 @@ void Voxelizer<Node>::voxelizeWorker(
                                                           , voxSplitRes.z ) 
                                               , extPartition );
 
-    device.extResolution = extPartition;
+    device.data.extResolution = extPartition;
 
     if (this->options.verbose) {
-        std::cout << "Left : " << ( device.left ? "Yes" : "No" ) << "\n";
-        std::cout << "Right: " << ( device.right ? "Yes" : "No" ) << "\n";
-        std::cout << "Down : " << ( device.down ? "Yes" : "No" ) << "\n";
-        std::cout << "Up   : " << ( device.up ? "Yes" : "No" ) << "\n";
+        std::cout << "Left : " << ( device.data.left ? "Yes" : "No" ) << "\n";
+        std::cout << "Right: " << ( device.data.right ? "Yes" : "No" ) << "\n";
+        std::cout << "Down : " << ( device.data.down ? "Yes" : "No" ) << "\n";
+        std::cout << "Up   : " << ( device.data.up ? "Yes" : "No" ) << "\n";
 
         std::cout << "Res, min: (" << partition.min.x << ", " << 
             partition.min.y << ", " << partition.min.z << ")\n";
@@ -971,8 +1016,8 @@ void Voxelizer<Node>::voxelizeWorker(
         std::cout << "Ext res, max: (" << extPartition.max.x << ", " << 
             extPartition.max.y << ", " << extPartition.max.z << ")\n";
 
-        std::cout << "MinVertex: (" << device.extMinVertex.x << ", " << 
-            device.extMinVertex.y << ", " << device.extMinVertex.z << ")\n";
+        std::cout << "MinVertex: (" << device.data.extMinVertex.x << ", " << 
+            device.data.extMinVertex.y << ", " << device.data.extMinVertex.z << ")\n";
     }
 
     // Perform voxelization.
@@ -995,7 +1040,7 @@ void Voxelizer<Node>::voxelizeWorker(
     // box to use. Split it into smaller spaces according to the maximum size 
     // demands and process the individual spaces sequentially, just like in 
     // the plain voxelization.
-    Bounds<uint3> allocPartition = device.allocResolution;
+    Bounds<uint3> allocPartition = device.data.allocResolution;
     uint3 allocRes = allocPartition.max - allocPartition.min;
 
     auto allocYzSplits = splitResolutionByMaxDim( make_uint2( voxSplitRes.y 
@@ -1005,7 +1050,7 @@ void Voxelizer<Node>::voxelizeWorker(
     uint nrOfNodes = allocRes.x * allocRes.y * allocRes.z;
 
     if ( !this->options.slicePrepared )
-        device.error_gpu = DevPtr<bool>( 1, device.dev );
+        device.error_gpu = DevPtr<bool>( 1, device.data.dev );
 
     device.nodes_gpu.zero();
 
@@ -1013,7 +1058,9 @@ void Voxelizer<Node>::voxelizeWorker(
     // representation. No materials or neighborhoods are calculated yet.
     for ( uint i = 0; i < allocYzSplits.first.x * allocYzSplits.first.y; ++i )
     {
-        calcNodeList( device,
+        calcNodeList( device.data,
+                      device.voxels_gpu.get(),
+                      device.nodes_gpu.get(),
                       allocYzSplits.second[i],
                       this->startTime,
                       this->options.verbose );
@@ -1025,8 +1072,12 @@ void Voxelizer<Node>::voxelizeWorker(
         // Classifies triangles according to their bounding boxes. This makes 
         // it possible to group similar triangles together to increase 
         // performance.
-        calcTriangleClassification( device 
+        calcTriangleClassification( device.data 
                                   , this->hostVars
+                                  , device.vertices_gpu.get()
+                                  , device.indices_gpu.get()
+                                  , device.triangleTypes_gpu.get()
+                                  , device.sortedTriangles_gpu.get()
                                   , this->startTime 
                                   , this->options.verbose );
         // Yet another subdivision. Since the surface voxelizer functions in 
@@ -1040,21 +1091,29 @@ void Voxelizer<Node>::voxelizeWorker(
             ; i < splits.first.x * splits.first.y * splits.first.z
             ; ++i )
         {
-            calcOptSurfaceVoxelization( device
+            calcOptSurfaceVoxelization( device.data
                                       , this->hostVars
+                                      , device.vertices_gpu.get()
+                                      , device.indices_gpu.get()
+                                      , device.triangleTypes_gpu.get()
+                                      , device.sortedTriangles_gpu.get()
+                                      , device.materials_gpu.get()
+                                      , device.nodes_gpu.get()
                                       , splits.second[i]
                                       , 1
                                       , this->startTime
                                       , this->options.verbose );
-            cudaDeviceProp devProps = device.devProps;
+            cudaDeviceProp devProps = device.data.devProps;
 
             // Because pending kernel calls execute so quickly after another, 
             // the device driver times out even though individual calls return 
             // before the timeout window. Due to this, the device needs to be 
             // synchronized every now and again to force CUDA to relinquish 
             // control over the device.
+#ifdef _WIN32
             if (devProps.kernelExecTimeoutEnabled > 0 && i % 2 == 0)
                 cudaDeviceSynchronize();
+#endif
         }
     }
     
@@ -1067,7 +1126,9 @@ void Voxelizer<Node>::voxelizeWorker(
         for ( uint i = 0
             ; i < allocYzSplits.first.x * allocYzSplits.first.y
             ; ++i )
-            restoreRotatedNodes( device
+            restoreRotatedNodes( device.data
+                               , device.nodes_gpu.get()
+                               , device.nodesCopy_gpu.get()
                                , allocYzSplits.second[i]
                                , this->startTime
                                , this->options.verbose );
@@ -1083,10 +1144,10 @@ void Voxelizer<Node>::voxelizeWorker(
         };
 
         // Then get the new min and max corners.
-        device.allocResolution.min = min( temp.min, temp.max );
-        device.allocResolution.max = max( temp.min, temp.max ) + 1;
+        device.data.allocResolution.min = min( temp.min, temp.max );
+        device.data.allocResolution.max = max( temp.min, temp.max ) + 1;
 
-        allocPartition = device.allocResolution;
+        allocPartition = device.data.allocResolution;
         allocRes = allocPartition.max - allocPartition.min;
 
         allocYzSplits = splitResolutionByMaxDim( make_uint2( voxSplitRes.y 
@@ -1102,18 +1163,19 @@ void Voxelizer<Node>::voxelizeWorker(
         {
             device.error = false;
 
-            device.error_gpu.
-                copyFrom( &device.error );
+            device.error_gpu.copyFrom( &device.error );
 
-            procNodeList( device 
+            procNodeList( device.data
+                        , device.nodes_gpu.get()
+                        , device.nodesCopy_gpu.get()
+                        , device.error_gpu.get()
                         , allocYzSplits.second[i]
                         , this->options.slices && 
                           this->options.sliceDirection == 0
                         , this->startTime 
                         , this->options.verbose );
 
-            device.error_gpu.
-                copyTo( &device.error );
+            device.error_gpu.copyTo( &device.error );
 
         } while ( device.error == true );
     }
@@ -1121,9 +1183,11 @@ void Voxelizer<Node>::voxelizeWorker(
     // Zero the padding. Since part of the border may contain nodes that 
     // overlap with another subspace, the entire border needs to be set to 
     // zero, unless there are no neighboring subspaces.
-    if ( device.left || device.right || device.up || device.down )
+    if ( device.data.left || device.data.right || device.data.up || device.data.down )
     {
-        makePaddingZero( device
+        makePaddingZero( device.data
+                       , device.nodes_gpu.get()
+                       , device.nodesCopy_gpu.get()
                        , this->options.slices && 
                          this->options.sliceDirection == 0
                        , this->startTime
@@ -1177,55 +1241,55 @@ void Voxelizer<Node>::fccWorker(
     DevContext<Node> & device )
 {
     // All processing in this thread will use this device.
-    cudaSetDevice( device.dev );
+    cudaSetDevice( device.data.dev );
 
     // The left, right, up and down bools tell if, in a multidevice
     // environment, some other device is voxelizing a subspace that is 
     // adjacent to this device's subspace in the given direction. Since each 
     // device voxelizes the entire x-direction, each device can only have at 
     // most 4 neighboring subspaces.
-    device.left = false;
-    device.right = false;
-    device.up = false;
-    device.down = false;
+    device.data.left = false;
+    device.data.right = false;
+    device.data.up = false;
+    device.data.down = false;
 
     // Rename to a shorter name.
-    Bounds<uint3> partition = device.resolution;
+    Bounds<uint3> partition = device.data.resolution;
     uint3 res = partition.max - partition.min; // Dimensions of the box.
 
     // Determine subspace neighborhoods.
     if ( partition.min.y == this->hostVars.resolution.min.y && 
          partition.max.y != this->hostVars.resolution.max.y )
-        device.right = true;
+        device.data.right = true;
     else if ( partition.max.y == this->hostVars.resolution.max.y && 
               partition.min.y != this->hostVars.resolution.min.y )
-        device.left = true;
+        device.data.left = true;
     else if ( partition.min.y != this->hostVars.resolution.min.y && 
               partition.max.y != this->hostVars.resolution.max.y ) 
     {
-        device.left = true;
-        device.right = true;
+        device.data.left = true;
+        device.data.right = true;
     }
 
     if ( partition.min.z == this->hostVars.resolution.min.z && 
          partition.max.z != this->hostVars.resolution.max.z )
-        device.up = true;
+        device.data.up = true;
     else if ( partition.max.z == this->hostVars.resolution.max.z && 
               partition.min.z != this->hostVars.resolution.min.z )
-        device.down = true;
+        device.data.down = true;
     else if ( partition.min.z != this->hostVars.resolution.min.z && 
               partition.max.z != this->hostVars.resolution.max.z ) 
     {
-        device.down = true;
-        device.up = true;
+        device.data.down = true;
+        device.data.up = true;
     }
 
     // Insert padding to get the correct allocation size.
-    device.allocResolution = device.resolution;
+    device.data.allocResolution = device.data.resolution;
 
     // Padding or extension.
-    device.allocResolution.max.y += 2;
-    device.allocResolution.max.z += 2;
+    device.data.allocResolution.max.y += 2;
+    device.data.allocResolution.max.z += 2;
 
     // Allocate memory, except when slices are enabled and the allocation
     // has already been performed.
@@ -1235,7 +1299,8 @@ void Voxelizer<Node>::fccWorker(
     else {
         // When using slicing and the first slice has been calculated, some 
         // data needs to be reset in order for everything to work correctly.
-        uint3 dim = device.allocResolution.max - device.allocResolution.min;
+        uint3 dim = 
+            device.data.allocResolution.max - device.data.allocResolution.min;
         if ( this->options.materials )
             device.triangleTypes_gpu.zero();
 
@@ -1246,15 +1311,15 @@ void Voxelizer<Node>::fccWorker(
         uint nrOfNodes = 4 * dim.x * dim.y * dim.z;
 
         if ( this->options.sliceDirection == 0 ) {
-            device.nodesCopy_gpu.reset( nrOfNodes, device.dev );
+            device.nodesCopy_gpu.reset( nrOfNodes, device.data.dev );
         }
         else
         {
-            device.nodes_gpu.reset( nrOfNodes, device.dev );
+            device.nodes_gpu.reset( nrOfNodes, device.data.dev );
         }
     }
 
-    device.maxWorkQueueSize = 0;
+    device.data.maxWorkQueueSize = 0;
 
     // The extended partition will be a space much like the original voxel 
     // space, but extended in the directions it has neighboring subspaces. 
@@ -1267,13 +1332,13 @@ void Voxelizer<Node>::fccWorker(
         make_uint3( partition.max.x, partition.max.y, partition.max.z )
     };
 
-    extPartition.min.y -= device.left ? 1 : 0;
-    extPartition.min.z -= device.down ? 1 : 0;
-    extPartition.max.y += device.right ? 1 : 0;
-    extPartition.max.z += device.up ? 1 : 0;
+    extPartition.min.y -= device.data.left ? 1 : 0;
+    extPartition.min.z -= device.data.down ? 1 : 0;
+    extPartition.max.y += device.data.right ? 1 : 0;
+    extPartition.max.z += device.data.up ? 1 : 0;
 
     // Update minimum bounds.
-    device.extMinVertex = make_double3(
+    device.data.extMinVertex = make_double3(
         this->hostVars.minVertex.x + double(extPartition.min.x) * 
             this->hostVars.voxelLength,
         this->hostVars.minVertex.y + double(extPartition.min.y) * 
@@ -1289,13 +1354,13 @@ void Voxelizer<Node>::fccWorker(
                                                           , voxSplitRes.z ) 
                                               , extPartition );
 
-    device.extResolution = extPartition;
+    device.data.extResolution = extPartition;
 
     if (this->options.verbose) {
-        std::cout << "Left : " << ( device.left ? "Yes" : "No" ) << "\n";
-        std::cout << "Right: " << ( device.right ? "Yes" : "No" ) << "\n";
-        std::cout << "Down : " << ( device.down ? "Yes" : "No" ) << "\n";
-        std::cout << "Up   : " << ( device.up ? "Yes" : "No" ) << "\n";
+        std::cout << "Left : " << ( device.data.left ? "Yes" : "No" ) << "\n";
+        std::cout << "Right: " << ( device.data.right ? "Yes" : "No" ) << "\n";
+        std::cout << "Down : " << ( device.data.down ? "Yes" : "No" ) << "\n";
+        std::cout << "Up   : " << ( device.data.up ? "Yes" : "No" ) << "\n";
 
         std::cout << "Res, min: (" << partition.min.x << ", " << 
             partition.min.y << ", " << partition.min.z << ")\n";
@@ -1307,15 +1372,16 @@ void Voxelizer<Node>::fccWorker(
         std::cout << "Ext res, max: (" << extPartition.max.x << ", " << 
             extPartition.max.y << ", " << extPartition.max.z << ")\n";
 
-        std::cout << "MinVertex: (" << device.extMinVertex.x << ", " << 
-            device.extMinVertex.y << ", " << device.extMinVertex.z << ")\n";
+        std::cout << "MinVertex: (" << device.data.extMinVertex.x << ", " << 
+            device.data.extMinVertex.y << ", " << device.data.extMinVertex.z 
+            << ")\n";
     }
 
     // Using the entire array now, so allocPartition is the right bounding 
     // box to use. Split it into smaller spaces according to the maximum size 
     // demands and process the individual spaces sequentially, just like in 
     // the plain voxelization.
-    Bounds<uint3> allocPartition = device.allocResolution;
+    Bounds<uint3> allocPartition = device.data.allocResolution;
     uint3 allocRes = allocPartition.max - allocPartition.min;
 
     auto allocYzSplits = splitResolutionByMaxDim( make_uint2( voxSplitRes.y 
@@ -1340,7 +1406,7 @@ void Voxelizer<Node>::fccWorker(
                           this->options.sliceDirection == 0;
 
     // Voxelize the four different grids and process them into the FCC grid.
-    double3 boundingBoxMin = device.extMinVertex;
+    double3 boundingBoxMin = device.data.extMinVertex;
     double halfWidth = this->hostVars.voxelLength / 2.0;
     for ( int gridType = 1; gridType < 5; ++gridType )
     {
@@ -1348,22 +1414,22 @@ void Voxelizer<Node>::fccWorker(
         // the alternating (by z) pattern in which the nodes are arranged is 
         // reversed due to the rotation.
         if ( gridType == 1 )
-            device.extMinVertex = boundingBoxMin +
+            device.data.extMinVertex = boundingBoxMin +
                 make_double3( 0.0
                             , 0.0
                             , xSlicing ? halfWidth : 0.0 );
         else if ( gridType == 2 )
-            device.extMinVertex = boundingBoxMin + 
+            device.data.extMinVertex = boundingBoxMin + 
                 make_double3( halfWidth
                             , halfWidth
                             , xSlicing ? halfWidth : 0.0 );
         else if ( gridType == 3 )
-            device.extMinVertex = boundingBoxMin + 
+            device.data.extMinVertex = boundingBoxMin + 
                 make_double3( 0.0
                             , halfWidth
                             , xSlicing ? 0.0 : halfWidth );
         else // if ( gridType == 4 )
-            device.extMinVertex = boundingBoxMin + 
+            device.data.extMinVertex = boundingBoxMin + 
                 make_double3( halfWidth
                             , 0.0
                             , xSlicing ? 0.0 : halfWidth );
@@ -1377,7 +1443,9 @@ void Voxelizer<Node>::fccWorker(
         for ( uint i = 0
             ; i < allocYzSplits.first.x * allocYzSplits.first.y
             ; ++i )
-            launchConvertToFCCGrid( device
+            launchConvertToFCCGrid( device.data
+                                  , device.voxels_gpu.get()
+                                  , device.nodes_gpu.get()
                                   , allocYzSplits.second[i]
                                   , xSlicing ? (gridType + 1) % 4 + 1 : 
                                                gridType
@@ -1386,7 +1454,7 @@ void Voxelizer<Node>::fccWorker(
 
         this->resetDataStructures( device );
     }
-    device.extMinVertex = boundingBoxMin;
+    device.data.extMinVertex = boundingBoxMin;
 
     // Deallocate the plain voxelization exclusive data structures, unless we
     // are voxelizing into slices.
@@ -1396,14 +1464,14 @@ void Voxelizer<Node>::fccWorker(
 
     // Change the dimensions and partitions to match the widened dimensions 
     // of the Node grid.
-    device.allocResolution.min.x *= 2;
-    device.allocResolution.max.x *= 2;
-    device.allocResolution.min.z *= 2;
-    device.allocResolution.max.z *= 2;
+    device.data.allocResolution.min.x *= 2;
+    device.data.allocResolution.max.x *= 2;
+    device.data.allocResolution.min.z *= 2;
+    device.data.allocResolution.max.z *= 2;
 
-    allocPartition = device.allocResolution;
-    allocRes = device.allocResolution.max -
-        device.allocResolution.min;
+    allocPartition = device.data.allocResolution;
+    allocRes = device.data.allocResolution.max -
+        device.data.allocResolution.min;
 
     for ( uint i = 0; i < allocYzSplits.first.x * allocYzSplits.first.y; ++i )
     {
@@ -1431,22 +1499,22 @@ void Voxelizer<Node>::fccWorker(
             //  the alternating (by z) pattern in which the nodes are arranged is 
             //  reversed due to the rotation.
             if ( gridType == 1 )
-                device.extMinVertex = boundingBoxMin +
+                device.data.extMinVertex = boundingBoxMin +
                     make_double3( 0
                                 , 0
                                 , xSlicing ? halfWidth : 0.0 );
             else if ( gridType == 2 )
-                device.extMinVertex = boundingBoxMin + 
+                device.data.extMinVertex = boundingBoxMin + 
                     make_double3( halfWidth
                                 , halfWidth
                                 , xSlicing ? halfWidth : 0.0 );
             else if ( gridType == 3 )
-                device.extMinVertex = boundingBoxMin + 
+                device.data.extMinVertex = boundingBoxMin + 
                     make_double3( 0.0
                                 , halfWidth
                                 , xSlicing ? 0.0 : halfWidth );
             else // if ( gridType == 4 )
-                device.extMinVertex = boundingBoxMin + 
+                device.data.extMinVertex = boundingBoxMin + 
                     make_double3( halfWidth
                                 , 0.0
                                 , xSlicing ? 0.0 : halfWidth );
@@ -1454,8 +1522,12 @@ void Voxelizer<Node>::fccWorker(
             // Classifies triangles according to their bounding boxes. This 
             // makes it possible to group similar triangles together to 
             // increase performance.
-            calcTriangleClassification( device 
+            calcTriangleClassification( device.data
                                       , this->hostVars
+                                      , device.vertices_gpu.get()
+                                      , device.indices_gpu.get()
+                                      , device.triangleTypes_gpu.get()
+                                      , device.sortedTriangles_gpu.get()
                                       , this->startTime 
                                       , this->options.verbose );
 
@@ -1463,14 +1535,20 @@ void Voxelizer<Node>::fccWorker(
                 ; i < splits.first.x * splits.first.y * splits.first.z
                 ; ++i )
             {
-                calcOptSurfaceVoxelization( device
+                calcOptSurfaceVoxelization( device.data
                                           , this->hostVars
+                                          , device.vertices_gpu.get()
+                                          , device.indices_gpu.get()
+                                          , device.triangleTypes_gpu.get()
+                                          , device.sortedTriangles_gpu.get()
+                                          , device.materials_gpu.get()
+                                          , device.nodes_gpu.get()
                                           , splits.second[i]
-                                          , xSlicing ? (gridType + 1) % 4 + 1 : 
-                                                       gridType
+                                          , xSlicing ? (gridType + 1) % 4 + 1
+                                                     : gridType
                                           , this->startTime
                                           , this->options.verbose );
-                cudaDeviceProp devProps = device.devProps;
+                cudaDeviceProp devProps = device.data.devProps;
 
                 // Because pending kernel calls execute so quickly after 
                 // another, the device driver times out even though individual 
@@ -1505,7 +1583,9 @@ void Voxelizer<Node>::fccWorker(
         for ( uint i = 0
             ; i < allocYzSplits.first.x * allocYzSplits.first.y
             ; ++i )
-            restoreRotatedNodes( device
+            restoreRotatedNodes( device.data
+                               , device.nodes_gpu.get()
+                               , device.nodesCopy_gpu.get()
                                , allocYzSplits.second[i]
                                , this->startTime
                                , this->options.verbose );
@@ -1521,12 +1601,12 @@ void Voxelizer<Node>::fccWorker(
         };
 
         // Then get the new min and max corners.
-        device.allocResolution.min = 
+        device.data.allocResolution.min = 
             make_uint3( temp.min.x - 1, temp.max.y, temp.min.z );
-        device.allocResolution.max = 
+        device.data.allocResolution.max = 
             make_uint3( temp.max.x + 1, temp.min.y + 1, temp.max.z + 1 );
 
-        allocPartition = device.allocResolution;
+        allocPartition = device.data.allocResolution;
         allocRes = allocPartition.max - allocPartition.min;
 
         allocYzSplits = splitResolutionByMaxDim( make_uint2( voxSplitRes.y 
@@ -1537,7 +1617,9 @@ void Voxelizer<Node>::fccWorker(
     // Calculate orientations.
     for ( uint i = 0; i < allocYzSplits.first.x * allocYzSplits.first.y; ++i )
     {
-        launchCalculateFCCBoundaries( device 
+        launchCalculateFCCBoundaries( device.data
+                                    , device.nodes_gpu.get()
+                                    , device.nodesCopy_gpu.get()
                                     , allocYzSplits.second[i]
                                     , this->options.slices && 
                                       this->options.sliceDirection == 0
@@ -1549,9 +1631,12 @@ void Voxelizer<Node>::fccWorker(
     // overlap with another subspace, the entire border needs to be set to 
     // zero, unless there are no neighboring subspaces.
     
-    if ( device.left || device.right || device.up || device.down )
+    if ( device.data.left || device.data.right || 
+         device.data.up || device.data.down )
     {
-        makePaddingZero( device
+        makePaddingZero( device.data
+                       , device.nodes_gpu.get()
+                       , device.nodesCopy_gpu.get()
                        , this->options.slices && 
                          this->options.sliceDirection == 0
                        , this->startTime
@@ -1713,7 +1798,7 @@ auto Voxelizer<Node>::voxelizeToNodesToRAM(
     uint3 voxSplitRes,
     uint3 matSplitRes ) -> NodePointer<Node> 
 {
-    NodePointer<Node> result;
+    auto result = NodePointer<Node>();
 
     if ( Node::isFCCNode() )
     {
@@ -1750,7 +1835,7 @@ auto Voxelizer<Node>::voxelizeToNodesToRAM(
     uint3 voxSplitRes,
     uint3 matSplitRes ) -> NodePointer<Node>
 {
-    NodePointer<Node> result;
+    auto result = NodePointer<Node>();
 
     this->options.nodeOutput = true;
     this->options.voxelDistanceGiven = true;
@@ -2011,7 +2096,7 @@ auto Voxelizer<Node>::voxelizeSliceToRAM( uint  maxDimension
                                         , uint2 matSplitRes )
     -> NodePointer<Node> 
 {
-    NodePointer<Node> result;
+    auto result = NodePointer<Node>();
 
     if ( Node::isFCCNode() )
     {
@@ -2099,7 +2184,7 @@ auto Voxelizer<Node>::voxelizeSliceToRAM( double cubeLength
                                              , uint2 matSplitRes )
     -> NodePointer<Node> 
 {
-    NodePointer<Node> result;
+    auto result = NodePointer<Node>();
 
     this->options.nodeOutput = true;
     this->options.slices = true;
@@ -2154,7 +2239,7 @@ auto Voxelizer<Node>::voxelizeToRAM( uint  maxDimension,
                                           uint3 voxSplitRes )
     -> NodePointer<Node>
 {
-    NodePointer<Node> result;
+    auto result = NodePointer<Node>();
 
     if ( Node::isFCCNode() )
     {
@@ -2190,7 +2275,7 @@ auto Voxelizer<Node>::voxelizeToRAM( double cubeLength,
                                           uint3 voxSplitRes )
     -> NodePointer<Node>
 {
-    NodePointer<Node> result;
+    NodePointer<Node> result = NodePointer<Node>();
 
     if ( Node::isFCCNode() )
     {
@@ -2224,29 +2309,29 @@ auto Voxelizer<Node>::voxelizeToRAM( double cubeLength,
 template <class Node> 
 void Voxelizer<Node>::determineBBAndResolution()
 {
-    this->hostVars.minVertex = make_double3( this->hostVars.vertices[0], 
-                                             this->hostVars.vertices[1],
-                                             this->hostVars.vertices[2] );
-    this->hostVars.maxVertex = make_double3( this->hostVars.vertices[0], 
-                                             this->hostVars.vertices[1], 
-                                             this->hostVars.vertices[2] );
+    this->hostVars.minVertex = make_double3( this->vertices[0], 
+                                             this->vertices[1],
+                                             this->vertices[2] );
+    this->hostVars.maxVertex = make_double3( this->vertices[0], 
+                                             this->vertices[1], 
+                                             this->vertices[2] );
 
     // Calculating the upper and lower bounds of the bounding box.
     for (uint i = 1; i < this->hostVars.nrOfVertices; i++)
     {
-        if (this->hostVars.vertices[3*i] > this->hostVars.maxVertex.x)
-            this->hostVars.maxVertex.x = this->hostVars.vertices[3*i];
-        if (this->hostVars.vertices[3*i + 1] > this->hostVars.maxVertex.y)
-            this->hostVars.maxVertex.y = this->hostVars.vertices[3*i + 1];
-        if (this->hostVars.vertices[3*i + 2] > this->hostVars.maxVertex.z)
-            this->hostVars.maxVertex.z = this->hostVars.vertices[3*i + 2];
+        if (this->vertices[3*i] > this->hostVars.maxVertex.x)
+            this->hostVars.maxVertex.x = this->vertices[3*i];
+        if (this->vertices[3*i + 1] > this->hostVars.maxVertex.y)
+            this->hostVars.maxVertex.y = this->vertices[3*i + 1];
+        if (this->vertices[3*i + 2] > this->hostVars.maxVertex.z)
+            this->hostVars.maxVertex.z = this->vertices[3*i + 2];
 
-        if (this->hostVars.vertices[3*i] < this->hostVars.minVertex.x)
-            this->hostVars.minVertex.x = this->hostVars.vertices[3*i];
-        if (this->hostVars.vertices[3*i + 1] < this->hostVars.minVertex.y)
-            this->hostVars.minVertex.y = this->hostVars.vertices[3*i + 1];
-        if (this->hostVars.vertices[3*i + 2] < this->hostVars.minVertex.z)
-            this->hostVars.minVertex.z = this->hostVars.vertices[3*i + 2];
+        if (this->vertices[3*i] < this->hostVars.minVertex.x)
+            this->hostVars.minVertex.x = this->vertices[3*i];
+        if (this->vertices[3*i + 1] < this->hostVars.minVertex.y)
+            this->hostVars.minVertex.y = this->vertices[3*i + 1];
+        if (this->vertices[3*i + 2] < this->hostVars.minVertex.z)
+            this->hostVars.minVertex.z = this->vertices[3*i + 2];
     }
 
     double3 diffVertex = this->hostVars.maxVertex - this->hostVars.minVertex;
@@ -2337,29 +2422,29 @@ void Voxelizer<Node>::determineBBAndResolution()
 template <class Node> 
 void Voxelizer<Node>::calculateBoundingBox()
 {
-    this->hostVars.minVertex = make_double3( this->hostVars.vertices[0], 
-                                             this->hostVars.vertices[1],
-                                             this->hostVars.vertices[2] );
-    this->hostVars.maxVertex = make_double3( this->hostVars.vertices[0], 
-                                             this->hostVars.vertices[1], 
-                                             this->hostVars.vertices[2] );
+    this->hostVars.minVertex = make_double3( this->vertices[0], 
+                                             this->vertices[1],
+                                             this->vertices[2] );
+    this->hostVars.maxVertex = make_double3( this->vertices[0], 
+                                             this->vertices[1], 
+                                             this->vertices[2] );
 
     // Calculating the upper and lower bounds of the bounding box.
     for (uint i = 1; i < this->hostVars.nrOfVertices; i++)
     {
-        if (this->hostVars.vertices[3*i] > this->hostVars.maxVertex.x)
-            this->hostVars.maxVertex.x = this->hostVars.vertices[3*i];
-        if (this->hostVars.vertices[3*i + 1] > this->hostVars.maxVertex.y)
-            this->hostVars.maxVertex.y = this->hostVars.vertices[3*i + 1];
-        if (this->hostVars.vertices[3*i + 2] > this->hostVars.maxVertex.z)
-            this->hostVars.maxVertex.z = this->hostVars.vertices[3*i + 2];
+        if (this->vertices[3*i] > this->hostVars.maxVertex.x)
+            this->hostVars.maxVertex.x = this->vertices[3*i];
+        if (this->vertices[3*i + 1] > this->hostVars.maxVertex.y)
+            this->hostVars.maxVertex.y = this->vertices[3*i + 1];
+        if (this->vertices[3*i + 2] > this->hostVars.maxVertex.z)
+            this->hostVars.maxVertex.z = this->vertices[3*i + 2];
 
-        if (this->hostVars.vertices[3*i] < this->hostVars.minVertex.x)
-            this->hostVars.minVertex.x = this->hostVars.vertices[3*i];
-        if (this->hostVars.vertices[3*i + 1] < this->hostVars.minVertex.y)
-            this->hostVars.minVertex.y = this->hostVars.vertices[3*i + 1];
-        if (this->hostVars.vertices[3*i + 2] < this->hostVars.minVertex.z)
-            this->hostVars.minVertex.z = this->hostVars.vertices[3*i + 2];
+        if (this->vertices[3*i] < this->hostVars.minVertex.x)
+            this->hostVars.minVertex.x = this->vertices[3*i];
+        if (this->vertices[3*i + 1] < this->hostVars.minVertex.y)
+            this->hostVars.minVertex.y = this->vertices[3*i + 1];
+        if (this->vertices[3*i + 2] < this->hostVars.minVertex.z)
+            this->hostVars.minVertex.z = this->vertices[3*i + 2];
     }
 }
 ///////////////////////////////////////////////////////////////////////////////
@@ -2535,11 +2620,11 @@ void Voxelizer<Node>::prepareForConstructWorkQueue(
         }
         else
         {
-            if (device.firstTriangleWithTiles < 0)
-                device.firstTriangleWithTiles = i;
+            if (device.data.firstTriangleWithTiles < 0)
+                device.data.firstTriangleWithTiles = i;
 
-            device.offsetBuffer[i] = device.workQueueSize;
-            device.workQueueSize += device.tileOverlaps[i];
+            device.offsetBuffer[i] = device.data.workQueueSize;
+            device.data.workQueueSize += device.tileOverlaps[i];
         }
     }
 }
@@ -2573,11 +2658,11 @@ void Voxelizer<Node>::printGeneralInfo( DevContext<Node> & device )
 {
     this->openLog("Voxelizer.log");
 
-    uint intsPerX = device.resolution.max.x >> VOX_DIV;
+    uint intsPerX = device.data.resolution.max.x >> VOX_DIV;
 
-    this->log << "Resolution: (" << device.resolution.max.x << ", " << 
-                 device.resolution.max.y << ", " << 
-                 device.resolution.max.z << "), Integers on the " << 
+    this->log << "Resolution: (" << device.data.resolution.max.x << ", " << 
+                 device.data.resolution.max.y << ", " << 
+                 device.data.resolution.max.z << "), Integers on the " << 
                  "x-axis: " << intsPerX << ".\n\n";
 
     this->log << "Printing triangle data:\n";
@@ -2586,17 +2671,17 @@ void Voxelizer<Node>::printGeneralInfo( DevContext<Node> & device )
     for (uint i = 0; i < this->hostVars.nrOfTriangles; i++)
     {
         v0 = make_double3(
-            this->hostVars.vertices[3*this->hostVars.indices[3*i + 0] + 0], 
-            this->hostVars.vertices[3*this->hostVars.indices[3*i + 0] + 1], 
-            this->hostVars.vertices[3*this->hostVars.indices[3*i + 0] + 2] );
+            this->vertices[3*this->indices[3*i + 0] + 0], 
+            this->vertices[3*this->indices[3*i + 0] + 1], 
+            this->vertices[3*this->indices[3*i + 0] + 2] );
         v1 = make_double3(
-            this->hostVars.vertices[3*this->hostVars.indices[3*i + 1] + 0], 
-            this->hostVars.vertices[3*this->hostVars.indices[3*i + 1] + 1], 
-            this->hostVars.vertices[3*this->hostVars.indices[3*i + 1] + 2] );
+            this->vertices[3*this->indices[3*i + 1] + 0], 
+            this->vertices[3*this->indices[3*i + 1] + 1], 
+            this->vertices[3*this->indices[3*i + 1] + 2] );
         v2 = make_double3(
-            this->hostVars.vertices[3*this->hostVars.indices[3*i + 2] + 0], 
-            this->hostVars.vertices[3*this->hostVars.indices[3*i + 2] + 1], 
-            this->hostVars.vertices[3*this->hostVars.indices[3*i + 2] + 2] );
+            this->vertices[3*this->indices[3*i + 2] + 0], 
+            this->vertices[3*this->indices[3*i + 2] + 1], 
+            this->vertices[3*this->indices[3*i + 2] + 2] );
         n = normalize(cross(v0 - v2, v1 - v0));
 
         this->log << "TID: " << i << "\n";
@@ -2675,7 +2760,7 @@ void Voxelizer<Node>::printWorkQueue(
     this->log << "Printing the work queue for the " << 
         (direction == xAxis ? "x" : (direction == yAxis ? "y" : "z")) << 
         " axis.\n";
-    uint i_max = device.workQueueSize;
+    uint i_max = device.data.workQueueSize;
 
     for (uint i = 0; i < i_max; i++)
     {
@@ -2702,7 +2787,7 @@ void Voxelizer<Node>::printSortedWorkQueue( DevContext<Node> & device
     this->log << "Printing the sorted work queue for the " << 
         (direction == xAxis ? "x" : (direction == yAxis ? "y" : "z")) << 
         " axis.\n";
-    uint i_max = device.workQueueSize;
+    uint i_max = device.data.workQueueSize;
 
     for (uint i = 0; i < i_max; i++)
     {
@@ -2730,7 +2815,7 @@ void Voxelizer<Node>::printCompactedList( DevContext<Node> & device
     this->log << "Printing the compacted tile list for the " << 
         (direction == xAxis ? "x" : (direction == yAxis ? "y" : "z")) <<
         " axis.\n";
-    for (uint i = 0; i < device.nrValidElements; i++)
+    for (uint i = 0; i < device.data.nrValidElements; i++)
     {
         this->log << "[" << device.tileList[i] << ", " << 
                      device.tileOffsets[i] << "] ";
@@ -3146,10 +3231,10 @@ void Voxelizer<Node>::rotateVertices()
     double b = centroid.y - centroid.x;
 
     for ( uint i = 0; i < this->hostVars.nrOfVertices; ++i ) {
-        double tempX = this->hostVars.vertices[3*i];
-        this->hostVars.vertices[3*i] = 
-            float(a - double(this->hostVars.vertices[3*i + 1]));
-        this->hostVars.vertices[3*i + 1] = float(b + tempX);
+        double tempX = this->vertices[3*i];
+        this->vertices[3*i] = 
+            float(a - double(this->vertices[3*i + 1]));
+        this->vertices[3*i + 1] = float(b + tempX);
     }
 }
 ///////////////////////////////////////////////////////////////////////////////
@@ -3205,7 +3290,7 @@ uint3 Voxelizer<Node>::getArrayDimensions( uint longestSizeInVoxels
                                               , bool sliceAlongX )
 {
     if ( sliceAlongX ) {
-        std::vector<float> vertsCopy( this->hostVars.vertices );
+        std::vector<float> vertsCopy( this->vertices );
 
         this->setResolution( longestSizeInVoxels );
         this->calculateBoundingBox();
@@ -3232,7 +3317,7 @@ uint3 Voxelizer<Node>::getArrayDimensions( uint longestSizeInVoxels
 
         result = this->hostVars.resolution.max - this->hostVars.resolution.min;
 
-        std::swap( this->hostVars.vertices, vertsCopy );
+        std::swap( this->vertices, vertsCopy );
 
         this->calculateBoundingBox();
 
@@ -3290,7 +3375,7 @@ uint3 Voxelizer<Node>::getArrayDimensions( double cubeLength
                                          , bool sliceAlongX )
 {
     if ( sliceAlongX ) {
-        std::vector<float> vertsCopy( this->hostVars.vertices );
+        std::vector<float> vertsCopy( this->vertices );
 
         uint3 oldMaxDim = this->hostVars.resolution.max;
         uint3 oldMinDim = this->hostVars.resolution.min;
@@ -3342,7 +3427,7 @@ uint3 Voxelizer<Node>::getArrayDimensions( double cubeLength
         this->hostVars.resolution.max = oldMaxDim;
         this->hostVars.resolution.min = oldMinDim;
 
-        std::swap( this->hostVars.vertices, vertsCopy );
+        std::swap( this->vertices, vertsCopy );
 
         this->calculateBoundingBox();
 
@@ -3430,14 +3515,14 @@ auto Voxelizer<Node>::collectData
     , const bool hostPointers
     ) -> NodePointer<Node>
 {
-    NodePointer<Node> result;
+    auto result = NodePointer<Node>();
 
     // Dimensions of the output grid.
-    const uint3 res = device.allocResolution.max - device.allocResolution.min;
+    const uint3 res = device.data.allocResolution.max - device.data.allocResolution.min;
 
-    result.dev = device.dev;
+    result.dev = device.data.dev;
     result.dim = res;
-    result.loc = device.location;
+    result.loc = device.data.location;
 
     if ( this->options.nodeOutput )
     {   // Outputting an array of Nodes.

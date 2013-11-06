@@ -15,7 +15,7 @@
 
 namespace vox {
 
-std::string to_string( int i ) { return std::to_string( (long long)i ) }
+std::string to_string( int i ) { return std::to_string( (long long)i ); }
 
 /// Options or state-tracking variables for the voxelizer.
 struct Options
@@ -35,19 +35,6 @@ struct Options
     bool simulateMultidevice;  ///< \brief Simulates multiple devices on one 
                                ///<        device.
                                ///<
-    /// Default constructor.
-    Options() throw() : nodeOutput(false)
-                      , materials(false)
-                      , slices(false)
-                      , slice(0)
-                      , sliceDirection(-1)
-                      , slicePrepared(false)
-                      , sliceOOB(false), verbose(false)
-                      , printing(false)
-                      , voxelDistanceGiven(false)
-                      , simulateMultidevice(false) {}
-    /// Default destructor.
-    ~Options() throw() {}
 };
 ///////////////////////////////////////////////////////////////////////////////
 /// \brief Exits the program, printing an error message if an error occurred.
@@ -88,7 +75,7 @@ class DevPtr
 {
 public:
     /// Default constructor.
-    DevPtr() throw(): _ptr( NULL ), _bytes( 0 ), _device( 0 ) {}
+    DevPtr() throw(): _ptr( nullptr ), _bytes( 0 ), _device( 0 ) {}
     ///////////////////////////////////////////////////////////////////////////
     /// \brief Constructor that allocates memory.
     ///
@@ -100,7 +87,7 @@ public:
     /// \param[in] device Which device the memory should be allocated on.
     ///////////////////////////////////////////////////////////////////////////
     DevPtr( std::size_t count, int device )
-          : _ptr( NULL ), _bytes( sizeof(T)*count ), _device( device )
+          : _ptr( nullptr ), _bytes( sizeof(T)*count ), _device( device )
     {
         try { allocate(); }
         catch ( ... ) { GPU_ERRCHK( cudaFree( _ptr ) ); throw; }
@@ -291,7 +278,7 @@ public:
     {
         T * result = _ptr;
 
-        _ptr = NULL;
+        _ptr = nullptr;
 
         return result;
     }
@@ -343,7 +330,7 @@ private:
     ///////////////////////////////////////////////////////////////////////////
     void unallocate()
     {
-        if ( _ptr == NULL )
+        if ( _ptr == nullptr )
             return;
 
         int currentDevice;
@@ -358,7 +345,7 @@ private:
         else
             GPU_ERRCHK( cudaFree( _ptr ) );
 
-        _ptr = NULL;
+        _ptr = nullptr;
     }
 
     T * _ptr;            ///< Device pointer.
@@ -377,13 +364,6 @@ struct DevContext
 {
     DevContext() {}
     ~DevContext() {}
-
-    int dev;						///< Device number.
-    cudaDeviceProp devProps;		///< Device properties.
-    size_t freeMem;					///< Free memory.
-    size_t maxMem;					///< Maximum memory.
-    uint blocks;				    ///< Number of blocks.
-    uint threads;					///< Number of threads per block.
 
     // GPU pointers.
     
@@ -412,6 +392,7 @@ struct DevContext
                                          ///<
     
     // Host pointers.
+
     std::vector<uint> tileOverlaps;       ///< Tile overlaps on host.
     std::vector<uint> offsetBuffer;       ///< Offset buffer on host.
     std::vector<uint> workQueueTriangles; ///< Work queue triangles on host.
@@ -422,73 +403,15 @@ struct DevContext
 
     // Host variables.
 
-    ///< \brief Minimum corner of the model's bounding box. 
-    ///<
-    ///< Matches exactly the voxelization space, meaning that there is no 
-    ///< padding or anything extra that won't make it to the final 
-    ///< voxelization.
-    ///<
-    double3		  minVertex;
-    ///< \brief Extended minimum corner of the model's bounding box. 
-    ///<
-    ///< If there is a neighboring subspace to the left or below, then this 
-    ///< differs from minVertex. The extension also happens during slicing.
-    ///<
-    double3       extMinVertex;
-    uint		  workQueueSize;            ///< Size of the work queue.
-    uint		  maxWorkQueueSize;         ///< \brief How much is allocated 
-                                            ///<        for the work queue.
-                                            ///<
-    /// Which triangle is the first to have non-zero overlapping tiles.
-    int			  firstTriangleWithTiles;
-    /// Essentially the size of the compacted tile list.
-    uint		  nrValidElements; 
-    /// Dimensions of the model's bounding box in voxels.
-    Bounds<uint3> resolution;
-    /// Dimensions of the extended bounding box in voxels.
-    Bounds<uint3> extResolution;
-    /// Dimensions of the array that stores the voxels. Includes padding.
-    Bounds<uint3> allocResolution;
-    /// Where a subspace is relative to the whole space.
-    uint3         location;
-    
-    bool          left;     ///< If there is a subspace to the left.
-    bool          right;    ///< If there is a subspace to the right.
-    bool          up;       ///< If there is a subspace above.
-    bool          down;     ///< If there is a subspace below.
+    CommonDevData data;     ///< \brief Contains various variables that need 
+                            ///<        to be passed on to kernel functions.
+                            ///<
 
 private:
     /// Disabled copy constructor.
     DevContext( const DevContext & rhs ) throw() {}
     /// Disabled copy assignment operator.
     DevContext & operator=( const DevContext & rhs ) throw() { return *this; }
-};
-///////////////////////////////////////////////////////////////////////////////
-/// \brief A container for many variables that don't need their own versions 
-///        for each device.
-///////////////////////////////////////////////////////////////////////////////
-struct HostContext
-{
-    std::vector<float> vertices;  ///< Vertices of the model.
-    std::vector<uint> indices;    ///< Triangle indices for the model.
-    std::vector<uchar> materials; ///< Triangle-material mappings.
-
-    uint		  nrOfTriangles;        ///< Number of triangles.
-    uint		  nrOfVertices;         ///< Number of vertices.
-    uint		  nrOfUniqueMaterials;  ///< Number of different materials.
-    double3		  minVertex;            ///< Minimum bounding box corner.
-    double3		  maxVertex;            ///< Maximum bounding box corner.
-    double		  voxelLength;          ///< Distance between voxel centers.
-    Bounds<uint3> resolution;           ///< Dimensions of the voxelization.
-
-    // Surface voxelization data.
-
-    uint		  start1DTris;          ///< Index where 1D Triangles start.
-    uint		  end1DTris;            ///< Index where 1D Triangles end.
-    uint		  start2DTris;          ///< Index where 2D Triangles start.
-    uint		  end2DTris;            ///< Index where 2D Triangles end.
-    uint		  start3DTris;          ///< Index where 3D Triangles start.
-    uint		  end3DTris;            ///< Index where 3D Triangles end.
 };
 
 } // End namespace vox

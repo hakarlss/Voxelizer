@@ -674,10 +674,6 @@ struct NodePointer {
     int dev;            ///< Device id the data resides on, if applicable.
     uint3 dim;          ///< Dimensions of the \p Node grid.
     uint3 loc;          ///< Location of the \p Node grid.
-
-    /// Default constructor.
-    NodePointer() throw()
-        : ptr(NULL), dev(0), dim(make_uint3(0)), loc(make_uint3(0)) {};
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -826,7 +822,7 @@ public:
     ///////////////////////////////////////////////////////////////////////////
     std::vector<float> getVertices() const throw() 
     { 
-        return this->hostVars.vertices; 
+        return this->vertices; 
     }
     ///////////////////////////////////////////////////////////////////////////
     /// \brief Returns the indices of the model.
@@ -835,7 +831,7 @@ public:
     ///////////////////////////////////////////////////////////////////////////
     std::vector<uint> getIndices() const throw() 
     { 
-        return this->hostVars.indices; 
+        return this->indices; 
     }
     ///////////////////////////////////////////////////////////////////////////
     /// \brief Returns the number of triangles in the model.
@@ -872,7 +868,7 @@ private:
     const int defaultDevice;       ///< Default device id. Should be 0.
     int nrOfDevices;               ///< Number of devices on the system.
 
-    HostContext hostVars;          ///< Host variables.
+    CommonHostData hostVars;       ///< Host variables.
     std::vector<Device> devices;   ///< Device-specific vars.
 
     Options options;               ///< \p Options for the voxelization.
@@ -881,6 +877,10 @@ private:
 
     bool fatalError;               ///< Allows immediate termination.
     clock_t startTime;             ///< Time taken at start of voxelization.
+
+    std::vector<float> vertices;   ///< Vertices of the model.
+    std::vector<uint> indices;     ///< Triangle indices for the model.
+    std::vector<uchar> materials;  ///< Triangle-material mappings.
 
     // Function declarations.
 

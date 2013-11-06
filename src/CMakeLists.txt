@@ -1,5 +1,5 @@
 # Sets up a build target for the Voxelizer that makes a library with CUDA.
-cuda_add_library( Voxelizer STATIC ${SOURCE_FILES} )
+cuda_add_library( Voxelizer STATIC ${SOURCE_FILES} ${HEADER_FILES} )
 
 # Sets library directories.
 target_link_libraries( Voxelizer ${Boost_LIBRARIES} )

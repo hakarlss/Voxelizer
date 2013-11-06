@@ -27,20 +27,20 @@ namespace vox {
 /// Handles the sorting of the <em>work queue</em> by using \a thrust.
 /// 
 /// \throws Exception if CUDA reports an error during execution.
-
+///
 /// \tparam Node Type of \p Node used.
 ///
-/// \param[in,out] devContext Reference to all relevant, device-specific 
-///                variables.
+/// \param[in,out] devData Reference to all relevant, device-specific 
+///                        variables.
 /// \param[in] startTime Time when the program started executing.
 /// \param[in] verbose Whether or not to print what is being done.
 ///////////////////////////////////////////////////////////////////////////////
-template <class Node> void sortWorkQueue(
-    uint * workQueueTriangles_gpu,
-    uint * workQueueTiles_gpu,
-    uint workQueueSize,
-    clock_t	     startTime, 
-    bool		 verbose )
+void sortWorkQueue(
+    CommonDevData const & devData,
+    uint                * workQueueTriangles_gpu,
+    uint                * workQueueTiles_gpu,
+    clock_t	              startTime, 
+    bool		          verbose )
 {
     if (verbose) 
         std::cout << (clock() - startTime) << ": Calling sortWorkQueue.\n";
@@ -50,7 +50,7 @@ template <class Node> void sortWorkQueue(
     thrust::device_ptr<uint> wqtil = thrust::device_pointer_cast<uint>(
         workQueueTiles_gpu );
 
-    thrust::sort_by_key( wqtil, wqtil + workQueueSize, wqtri );
+    thrust::sort_by_key( wqtil, wqtil + devData.workQueueSize, wqtri );
 
     checkCudaErrors( "sortWorkQueue" );
 }
@@ -65,20 +65,18 @@ template <class Node> void sortWorkQueue(
 ///
 /// \tparam Node Type of \p Node used.
 ///
-/// \param[in,out] devContext Reference to all relevant, device-specific 
-///                variables.
+/// \param[in,out] devData Reference to all relevant, device-specific 
+///                        variables.
 /// \param[in] startTime Time when the program started executing.
 /// \param[in] verbose Whether or not to print what is being done.
 ///////////////////////////////////////////////////////////////////////////////
-template <class Node> void compactWorkQueue(
-    uint * workQueueTiles_gpu,
-    uint * tileList_gpu,
-    uint * tileOffsets_gpu,
-    uint maxWorkQueueSize,
-    uint workQueueSize,
-    uint & nrOfValidElements,
-    clock_t		 startTime, 
-    bool		 verbose )
+void compactWorkQueue(
+    CommonDevData & devData,
+    uint          * workQueueTiles_gpu,
+    uint          * tileList_gpu,
+    uint          * tileOffsets_gpu,
+    clock_t		    startTime, 
+    bool	        verbose )
 {
     if (verbose) 
         std::cout << (clock() - startTime) << ": Calling compactWorkQueue.\n";
@@ -92,19 +90,19 @@ template <class Node> void compactWorkQueue(
 
     tl = thrust::device_pointer_cast(tileList_gpu);
     to = thrust::device_pointer_cast(tileOffsets_gpu);
-    iv = thrust::device_malloc<uint>(maxWorkQueueSize);
-    thrust::sequence(iv, iv + maxWorkQueueSize, 0, 1);
+    iv = thrust::device_malloc<uint>(devData.maxWorkQueueSize);
+    thrust::sequence(iv, iv + devData.maxWorkQueueSize, 0, 1);
 
     ne = thrust::unique_by_key_copy( wqtil, 
-                                     wqtil + workQueueSize, 
+                                     wqtil + devData.workQueueSize, 
                                      iv, 
                                      tl, 
                                      to );
 
-    nrValidElements = uint( ne.first - tl );
+    devData.nrValidElements = uint( ne.first - tl );
 
-    // devContext.tileList_gpu = thrust::raw_pointer_cast(tl);
-    // devContext.tileOffsets_gpu = thrust::raw_pointer_cast(to);
+    // devData.tileList_gpu = thrust::raw_pointer_cast(tl);
+    // devData.tileOffsets_gpu = thrust::raw_pointer_cast(to);
 
     thrust::device_free(iv);
 
@@ -118,29 +116,28 @@ template <class Node> void compactWorkQueue(
 ///
 /// \tparam Node Type of \p Node used.
 ///
-/// \param[in,out] devContext Reference to all relevant, device-specific 
-///                variables.
-/// \param[in] hostContext Reference to all relevant non device-specific 
+/// \param[in,out] devData Reference to all relevant, device-specific 
 ///                        variables.
+/// \param[in] hostData Reference to all relevant non device-specific 
+///                     variables.
 /// \param[in] yzSubSpace The bounding box for the subspace that is to be 
 ///                       voxelized.
 /// \param[in] startTime Time when the program started executing.
 /// \param[in] verbose Whether or not to print what is being done.
 ///////////////////////////////////////////////////////////////////////////////
-template <class Node> void calcTileOverlap(
-    uint blocks,
-    uint threadsPerBlock,
-    float * vertices_gpu,
-    uint * indices_gpu,
-    uint tileOverlaps_gpu,
-    uint nrOfTriangles,
-    double3 extMinVertex,
-    double voxelLength,
-    Bounds<uint3> extResolution,
-    Bounds<uint2> const & yzSubSpace, 
-    clock_t				  startTime, 
-    bool				  verbose )
+void calcTileOverlap(
+    CommonDevData  const & devData,
+    CommonHostData const & hostData,
+    float                * vertices_gpu,
+    uint                 * indices_gpu,
+    uint                 * tileOverlaps_gpu,
+    Bounds<uint2>  const & yzSubSpace, 
+    clock_t				   startTime, 
+    bool				   verbose )
 {
+    uint blocks = devData.blocks;
+    uint threadsPerBlock = devData.threads;
+
     if (verbose) 
         std::cout << (clock() - startTime) << ": Calling calculateTileOverlap"
                      "<<<" << blocks << ", " << threadsPerBlock << ">>> (" << 
@@ -148,13 +145,13 @@ template <class Node> void calcTileOverlap(
 
     calculateTileOverlap
         <<< blocks, 
-            threadsPerBlock >>>( devContext.vertices_gpu.get()
-                               , devContext.indices_gpu.get()
-                               , devContext.tileOverlaps_gpu.get()
-                               , hostContext.nrOfTriangles
-                               , devContext.extMinVertex
-                               , hostContext.voxelLength
-                               , devContext.extResolution
+            threadsPerBlock >>>( vertices_gpu
+                               , indices_gpu
+                               , tileOverlaps_gpu
+                               , hostData.nrOfTriangles
+                               , devData.extMinVertex
+                               , hostData.voxelLength
+                               , devData.extResolution
                                , yzSubSpace );
 
     checkCudaErrors( "calcTileOverlap" );
@@ -167,32 +164,30 @@ template <class Node> void calcTileOverlap(
 ///
 /// \tparam Node Type of \p Node used.
 ///
-/// \param[in,out] devContext Reference to all relevant, device-specific 
+/// \param[in,out] devData Reference to all relevant, device-specific 
 ///                variables.
-/// \param[in] hostContext Reference to all relevant non device-specific 
+/// \param[in] hostData Reference to all relevant non device-specific 
 ///                        variables.
 /// \param[in] yzSubSpace The bounding box for the subspace that is to be 
 ///                       voxelized.
 /// \param[in] startTime Time when the program started executing.
 /// \param[in] verbose Whether or not to print what is being done.
 ///////////////////////////////////////////////////////////////////////////////
-template <class Node> void calcWorkQueue(
-    uint blocks,
-    uint threadsPerBlock,
-    float * vertices_gpu,
-    uint * indices_gpu,
-    uint * workQueueTriangles_gpu,
-    uint * workQueueTiles_gpu,
-    uint * offsetBuffer_gpu,
-    uint nrOfTriangles,
-    double3 extMinVertex,
-    int firstTriangleWithTiles,
-    double voxelLength,
-    Bounds<uint3> extResolution,
-    Bounds<uint2> const & yzSubSpace,
-    clock_t				  startTime, 
-    bool				  verbose )
+void calcWorkQueue(
+    CommonDevData  const & devData,
+    CommonHostData const & hostData,
+    float                * vertices_gpu,
+    uint                 * indices_gpu,
+    uint                 * workQueueTriangles_gpu,
+    uint                 * workQueueTiles_gpu,
+    uint                 * offsetBuffer_gpu,
+    Bounds<uint2>  const & yzSubSpace,
+    clock_t			       startTime, 
+    bool				   verbose )
 {
+    uint blocks = devData.blocks;
+    uint threadsPerBlock = devData.threads;
+
     if (verbose) 
         std::cout << (clock() - startTime) << ": Calling constructWorkQueue"
                      "<<<" << blocks << ", " << threadsPerBlock << ">>> (" << 
@@ -200,16 +195,16 @@ template <class Node> void calcWorkQueue(
 
     constructWorkQueue
         <<< blocks, 
-            threadsPerBlock >>>( devContext.vertices_gpu.get(), 
-                                 devContext.indices_gpu.get(), 
-                                 devContext.workQueueTriangles_gpu.get(), 
-                                 devContext.workQueueTiles_gpu.get(), 
-                                 devContext.offsetBuffer_gpu.get(), 
-                                 hostContext.nrOfTriangles, 
-                                 devContext.extMinVertex, 
-                                 devContext.firstTriangleWithTiles, 
-                                 hostContext.voxelLength, 
-                                 devContext.extResolution, 
+            threadsPerBlock >>>( vertices_gpu, 
+                                 indices_gpu, 
+                                 workQueueTriangles_gpu, 
+                                 workQueueTiles_gpu, 
+                                 offsetBuffer_gpu, 
+                                 hostData.nrOfTriangles, 
+                                 devData.extMinVertex, 
+                                 devData.firstTriangleWithTiles, 
+                                 hostData.voxelLength, 
+                                 devData.extResolution, 
                                  yzSubSpace );
 
     checkCudaErrors( "calcWorkQueue" );
@@ -222,37 +217,30 @@ template <class Node> void calcWorkQueue(
 ///
 /// \tparam Node Type of \p Node used.
 ///
-/// \param[in,out] devContext Reference to all relevant, device-specific 
+/// \param[in,out] devData Reference to all relevant, device-specific 
 ///                           variables.
-/// \param[in] hostContext Reference to all relevant non device-specific 
+/// \param[in] hostData Reference to all relevant non device-specific 
 ///                        variables.
 /// \param[in] subSpace The bounding box for the subspace that is to be 
 ///                     voxelized.
 /// \param[in] startTime Time when the program started executing.
 /// \param[in] verbose Whether or not to print what is being done.
 ///////////////////////////////////////////////////////////////////////////////
-template <class Node> void calcVoxelization(
-    float * vertices_gpu,
-    uint * indices_gpu,
-    uint * workQueueTriangles_gpu,
-    uint * workQueueTiles_gpu,
-    uint * tileList_gpu,
-    uint * tileOffsets_gpu,
-    VoxInt * voxels_gpu,
-    uint nrOfTriangles,
-    uint workQueueSize,
-    double3 extMinVertex,
-    double voxelLength,
-    bool left,
-    bool right,
-    bool up,
-    bool down,
-    Bounds<uint3> extResolution,
-    Bounds<uint3> const & subSpace, 
-    clock_t				  startTime, 
-    bool				  verbose )
+void calcVoxelization(
+    CommonDevData  const & devData,
+    CommonHostData const & hostData,
+    float                * vertices_gpu,
+    uint                 * indices_gpu,
+    uint                 * workQueueTriangles_gpu,
+    uint                 * workQueueTiles_gpu,
+    uint                 * tileList_gpu,
+    uint                 * tileOffsets_gpu,
+    VoxInt               * voxels_gpu,
+    Bounds<uint3>  const & subSpace, 
+    clock_t                startTime, 
+    bool				   verbose )
 {
-    uint const blocks = devContext.nrValidElements;
+    uint const blocks = devData.nrValidElements;
     dim3 const threadsPerBlock(16, 4);
 
     if (verbose) 
@@ -263,22 +251,22 @@ template <class Node> void calcVoxelization(
     
     generateVoxelization
         <<< blocks, 
-            threadsPerBlock >>>( devContext.vertices_gpu.get(), 
-                                 devContext.indices_gpu.get(), 
-                                 devContext.workQueueTriangles_gpu.get(), 
-                                 devContext.workQueueTiles_gpu.get(), 
-                                 devContext.tileList_gpu.get(), 
-                                 devContext.tileOffsets_gpu.get(), 
-                                 devContext.voxels_gpu.get(), 
-                                 hostContext.nrOfTriangles, 
-                                 devContext.workQueueSize, 
-                                 devContext.extMinVertex, 
-                                 hostContext.voxelLength, 
-                                 devContext.left,
-                                 devContext.right,
-                                 devContext.up,
-                                 devContext.down,
-                                 devContext.extResolution, 
+            threadsPerBlock >>>( vertices_gpu, 
+                                 indices_gpu, 
+                                 workQueueTriangles_gpu, 
+                                 workQueueTiles_gpu, 
+                                 tileList_gpu, 
+                                 tileOffsets_gpu, 
+                                 voxels_gpu, 
+                                 hostData.nrOfTriangles, 
+                                 devData.workQueueSize, 
+                                 devData.extMinVertex, 
+                                 hostData.voxelLength, 
+                                 devData.left,
+                                 devData.right,
+                                 devData.up,
+                                 devData.down,
+                                 devData.extResolution, 
                                  subSpace ); 
 
     checkCudaErrors( "calcVoxelization" );
@@ -291,7 +279,7 @@ template <class Node> void calcVoxelization(
 ///
 /// \tparam Node Type of \p Node used.
 ///
-/// \param[in,out] devContext Reference to all relevant, device-specific 
+/// \param[in,out] devData Reference to all relevant, device-specific 
 ///                variables.
 /// \param[in] yzSubSpace The bounding box for the subspace that is to be 
 ///                       voxelized.
@@ -299,16 +287,15 @@ template <class Node> void calcVoxelization(
 /// \param[in] verbose Whether or not to print what is being done.
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node> void calcNodeList(
-    uint blocks,
-    uint threads,
-    VoxInt * voxels_gpu,
-    Node * nodes_gpu,
-    Bounds<uint3> allocResolution,
-    Bounds<uint2> const & yzSubSpace, 
-    clock_t				  startTime, 
-    bool				  verbose )
+    CommonDevData  const & devData,
+    VoxInt               * voxels_gpu,
+    Node                 * nodes_gpu,
+    Bounds<uint2>  const & yzSubSpace, 
+    clock_t				   startTime, 
+    bool				   verbose )
 {
-    dim3 threadsPerBlock( devContext.threads >> VOX_DIV, 32 );
+    uint blocks = devData.blocks;
+    dim3 threadsPerBlock( devData.threads >> VOX_DIV, 32 );
 
     if (verbose) 
         std::cout << (clock() - startTime) << ": Calling constructNodeList"
@@ -317,9 +304,9 @@ template <class Node> void calcNodeList(
                      << yzSubSpace.min.y << ")\n";
     
     constructNodeList2<Node>
-        <<< blocks, threadsPerBlock >>>( devContext.voxels_gpu.get(),
-                                         devContext.nodes_gpu.get(),
-                                         devContext.allocResolution,
+        <<< blocks, threadsPerBlock >>>( voxels_gpu,
+                                         nodes_gpu,
+                                         devData.allocResolution,
                                          yzSubSpace );
 
     checkCudaErrors( "calcNodeList" );
@@ -334,7 +321,7 @@ template <class Node> void calcNodeList(
 ///              than FCC Nodes, but kernels expecting FCC Nodes don't work 
 ///              properly with any other types.
 ///
-/// \param[in,out] devContext Reference to all relevant, device-specific 
+/// \param[in,out] devData Reference to all relevant, device-specific 
 ///                variables.
 /// \param[in] yzSubSpace The bounding box for the subspace that is to be 
 ///                       voxelized.
@@ -345,14 +332,16 @@ template <class Node> void calcNodeList(
 /// \param[in] verbose Whether or not to print what is being done.
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node> void launchConvertToFCCGrid(
-    DevContext<Node>          & devContext, 
+    CommonDevData const & devData, 
+    VoxInt              * voxels_gpu,
+    Node                * nodes_gpu,
     Bounds<uint2> const & yzSubSpace, 
     int                   gridType,
     clock_t				  startTime, 
     bool				  verbose )
 {
-    uint blocks = devContext.blocks;
-    dim3 threadsPerBlock( devContext.threads >> VOX_DIV, 32 );
+    uint blocks = devData.blocks;
+    dim3 threadsPerBlock( devData.threads >> VOX_DIV, 32 );
 
     if (verbose) 
         std::cout << (clock() - startTime) << ": Calling convertToFCCGrid"
@@ -361,10 +350,10 @@ template <class Node> void launchConvertToFCCGrid(
                      << yzSubSpace.min.y << ")\n";
     
     convertToFCCGrid<Node>
-        <<< blocks, threadsPerBlock >>>( devContext.voxels_gpu.get(),
-                                         devContext.nodes_gpu.get(),
+        <<< blocks, threadsPerBlock >>>( voxels_gpu,
+                                         nodes_gpu,
                                          gridType,
-                                         devContext.allocResolution,
+                                         devData.allocResolution,
                                          yzSubSpace );
 
     checkCudaErrors( "launchConvertToFCCGrid" );
@@ -377,7 +366,7 @@ template <class Node> void launchConvertToFCCGrid(
 ///
 /// \tparam Node Type of \p Node used.
 ///
-/// \param[in,out] devContext Reference to all relevant, device-specific 
+/// \param[in,out] devData Reference to all relevant, device-specific 
 ///                           variables.
 /// \param[in] yzSubSpace The bounding box for the \a subspace that is to be 
 ///                       voxelized.
@@ -387,28 +376,31 @@ template <class Node> void launchConvertToFCCGrid(
 /// \param[in] verbose Whether or not to print what is being done.
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node> void procNodeList(
-    DevContext<Node>          & devContext, 
+    CommonDevData const & devData, 
+    Node                * nodes_gpu,
+    Node                * nodesCopy_gpu,
+    bool                * error_gpu,
     Bounds<uint2> const & yzSubSpace,
     bool                  xSlicing,
     clock_t				  startTime, 
     bool				  verbose )
 {
-    uint blocks = devContext.blocks;
-    uint threadsPerBlock = devContext.threads;
+    uint blocks = devData.blocks;
+    uint threadsPerBlock = devData.threads;
 
     if (verbose) 
         std::cout << (clock() - startTime) << ": Calling fillNodeList<<<" << 
         blocks << ", " << threadsPerBlock << ">>> (" << yzSubSpace.min.x << 
         ", " << yzSubSpace.min.y << ")\n";
 
-    Node * nodePtr = xSlicing ? devContext.nodesCopy_gpu.get()
-                              : devContext.nodes_gpu.get();
+    Node * nodePtr = xSlicing ? nodesCopy_gpu
+                              : nodes_gpu;
     
     fillNodeList2<Node>
         <<< blocks, threadsPerBlock >>>( nodePtr, 
-                                         devContext.allocResolution, 
+                                         devData.allocResolution, 
                                          yzSubSpace,
-                                         devContext.error_gpu.get() );
+                                         error_gpu );
 
     checkCudaErrors( "procNodeList" );
 }
@@ -420,7 +412,7 @@ template <class Node> void procNodeList(
 ///
 /// \tparam Node Type of \p Node used.
 ///
-/// \param[in,out] devContext Reference to all relevant, device-specific 
+/// \param[in,out] devData Reference to all relevant, device-specific 
 ///                           variables.
 /// \param[in] yzSubSpace The bounding box for the \a subspace that is to be 
 ///                       voxelized.
@@ -430,14 +422,16 @@ template <class Node> void procNodeList(
 /// \param[in] verbose Whether or not to print what is being done.
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node> void launchCalculateFCCBoundaries(
-    DevContext<Node>          & devContext, 
+    CommonDevData const & devData, 
+    Node                * nodes_gpu,
+    Node                * nodesCopy_gpu,
     Bounds<uint2> const & yzSubSpace,
     bool                  xSlicing,
     clock_t				  startTime, 
     bool				  verbose )
 {
-    uint blocks = devContext.blocks;
-    uint threadsPerBlock = devContext.threads;
+    uint blocks = devData.blocks;
+    uint threadsPerBlock = devData.threads;
 
     if (verbose) 
         std::cout << (clock() - startTime) << ": Calling "
@@ -445,12 +439,12 @@ template <class Node> void launchCalculateFCCBoundaries(
                      threadsPerBlock << ">>> (" << yzSubSpace.min.x << ", " << 
                      yzSubSpace.min.y << ")\n";
 
-    Node * nodePtr = xSlicing ? devContext.nodesCopy_gpu.get()
-                              : devContext.nodes_gpu.get();
+    Node * nodePtr = xSlicing ? nodesCopy_gpu
+                              : nodes_gpu;
     
     calculateFCCBoundaries<Node>
         <<< blocks, threadsPerBlock >>>( nodePtr, 
-                                         devContext.allocResolution, 
+                                         devData.allocResolution, 
                                          yzSubSpace );
 
     checkCudaErrors( "launchCalculateFCCBoundaries" );
@@ -463,40 +457,44 @@ template <class Node> void launchCalculateFCCBoundaries(
 ///
 /// \tparam Node Type of \p Node used.
 ///
-/// \param[in,out] devContext Reference to all relevant, device-specific 
+/// \param[in,out] devData Reference to all relevant, device-specific 
 ///                           variables.
-/// \param[in] hostContext Reference to all relevant non device-specific 
+/// \param[in] hostData Reference to all relevant non device-specific 
 ///                        variables.
 /// \param[in] startTime Time when the program started executing.
 /// \param[in] verbose Whether or not to print what is being done.
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node> void calcSurfaceVoxelization(
-    DevContext<Node>        & devContext, 
-    HostContext const & hostContext, 
-    clock_t				startTime, 
-    bool				verbose )
+    CommonDevData  const & devData, 
+    CommonHostData const & hostData, 
+    float                * vertices_gpu, 
+    uint                 * indices_gpu, 
+    Node                 * nodes_gpu, 
+    uchar                * materials_gpu, 
+    clock_t				   startTime, 
+    bool				   verbose )
 {
-    uint blocks = devContext.blocks;
-    uint threadsPerBlock = devContext.threads;
+    uint blocks = devData.blocks;
+    uint threadsPerBlock = devData.threads;
 
     if (verbose) 
         std::cout << (clock() - startTime) << 
                 ": Calling SimpleSurfaceVoxelization<<<" << blocks << ", " << 
                 threadsPerBlock << ">>>\n";
     
-    float3 minVertex = make_float3( float(devContext.minVertex.x), 
-                                    float(devContext.minVertex.y), 
-                                    float(devContext.minVertex.z) );
-    float voxelLength = (float)hostContext.voxelLength;
+    float3 minVertex = make_float3( float(devData.minVertex.x), 
+                                    float(devData.minVertex.y), 
+                                    float(devData.minVertex.z) );
+    float voxelLength = (float)hostData.voxelLength;
 
-    uint3 resolution = devContext.resolution.max - devContext.resolution.min;
+    uint3 resolution = devData.resolution.max - devData.resolution.min;
 
     SimpleSurfaceVoxelizer<Node>
-        <<< blocks, threadsPerBlock >>>( devContext.vertices_gpu.get(), 
-                                         devContext.indices_gpu.get(), 
-                                         devContext.nodes_gpu.get(), 
-                                         devContext.materials_gpu.get(), 
-                                         hostContext.nrOfTriangles, 
+        <<< blocks, threadsPerBlock >>>( vertices_gpu, 
+                                         indices_gpu, 
+                                         nodes_gpu, 
+                                         materials_gpu, 
+                                         hostData.nrOfTriangles, 
                                          minVertex, 
                                          voxelLength, 
                                          resolution );
@@ -512,21 +510,25 @@ template <class Node> void calcSurfaceVoxelization(
 ///
 /// \tparam Node Type of \p Node used.
 ///
-/// \param[in,out] devContext Reference to all relevant, device-specific 
+/// \param[in,out] devData Reference to all relevant, device-specific 
 ///                           variables.
-/// \param[in] hostContext Reference to all relevant non device-specific 
+/// \param[in] hostData Reference to all relevant non device-specific 
 ///                        variables.
 /// \param[in] startTime Time when the program started executing.
 /// \param[in] verbose Whether or not to print what is being done.
 ///////////////////////////////////////////////////////////////////////////////
-template <class Node> void calcTriangleClassification(
-    DevContext<Node> & devContext, 
-    HostContext & hostContext, 
-    clock_t		  startTime, 
-    bool		  verbose )
+void calcTriangleClassification(
+    CommonDevData  const & devData, 
+    CommonHostData       & hostData, 
+    float                * vertices_gpu, 
+    uint                 * indices_gpu, 
+    uint                 * triangleTypes_gpu,
+    uint                 * sortedTriangles_gpu,
+    clock_t		           startTime, 
+    bool		           verbose )
 {
-    uint blocks = devContext.blocks;
-    uint threadsPerBlock = devContext.threads;
+    uint blocks = devData.blocks;
+    uint threadsPerBlock = devData.threads;
 
 
     if (verbose) 
@@ -535,52 +537,52 @@ template <class Node> void calcTriangleClassification(
 
     // Classify the triangles by assigning them their bounding box type, 
     // dominant axis and estimated number of voxel columns to process.
-    float3 modelBBMin = make_float3( float(devContext.extMinVertex.x), 
-                                     float(devContext.extMinVertex.y),
-                                     float(devContext.extMinVertex.z) );
+    float3 modelBBMin = make_float3( float(devData.extMinVertex.x), 
+                                     float(devData.extMinVertex.y),
+                                     float(devData.extMinVertex.z) );
 
     classifyTriangles
-        <<< blocks, threadsPerBlock >>>( devContext.vertices_gpu.get(), 
-                                         devContext.indices_gpu.get(), 
-                                         devContext.triangleTypes_gpu.get(),
-                                         hostContext.nrOfTriangles, 
+        <<< blocks, threadsPerBlock >>>( vertices_gpu, 
+                                         indices_gpu, 
+                                         triangleTypes_gpu,
+                                         hostData.nrOfTriangles, 
                                          modelBBMin, 
-                                         float(hostContext.voxelLength) );
+                                         float(hostData.voxelLength) );
     // Sort the triangles by classification.
     thrust::device_ptr<uint> triTypes = 
-        thrust::device_pointer_cast<uint>(devContext.triangleTypes_gpu.get());
+        thrust::device_pointer_cast<uint>(triangleTypes_gpu);
     thrust::device_ptr<uint> tris = thrust::device_pointer_cast<uint>(
-        devContext.sortedTriangles_gpu.get());
-    thrust::sequence( tris, tris + hostContext.nrOfTriangles, 0, 1 );
+        sortedTriangles_gpu);
+    thrust::sequence( tris, tris + hostData.nrOfTriangles, 0, 1 );
     thrust::sort_by_key( triTypes
-                       , triTypes + hostContext.nrOfTriangles
+                       , triTypes + hostData.nrOfTriangles
                        , tris );
 
     // Calculate the number of different types of triangle.
     uint nrOf0DTris = 
         (uint)thrust::count_if( triTypes, 
-                                triTypes + hostContext.nrOfTriangles, 
+                                triTypes + hostData.nrOfTriangles, 
                                 is_BB< BBType_Degen, VOX_BPI - 2 >() );
     uint nrOf1DTris = 
         (uint)thrust::count_if( triTypes, 
-                                triTypes + hostContext.nrOfTriangles, 
+                                triTypes + hostData.nrOfTriangles, 
                                 is_BB< BBType_1D, VOX_BPI - 2 >() );
     uint nrOf2DTris = 
         (uint)thrust::count_if( triTypes, 
-                                triTypes + hostContext.nrOfTriangles, 
+                                triTypes + hostData.nrOfTriangles, 
                                 is_BB< BBType_2D, VOX_BPI - 2 >() );
     uint nrOf3DTris = 
         (uint)thrust::count_if( triTypes, 
-                                triTypes + hostContext.nrOfTriangles, 
+                                triTypes + hostData.nrOfTriangles, 
                                 is_BB< BBType_3D, VOX_BPI - 2 >() );
 
     // Determine start and end indices for each bounding box type.
-    hostContext.start1DTris = nrOf0DTris;
-    hostContext.end1DTris = hostContext.start1DTris + nrOf1DTris;
-    hostContext.start2DTris = hostContext.end1DTris;
-    hostContext.end2DTris = hostContext.start2DTris + nrOf2DTris;
-    hostContext.start3DTris = hostContext.end2DTris;
-    hostContext.end3DTris = hostContext.start3DTris + nrOf3DTris;
+    hostData.start1DTris = nrOf0DTris;
+    hostData.end1DTris = hostData.start1DTris + nrOf1DTris;
+    hostData.start2DTris = hostData.end1DTris;
+    hostData.end2DTris = hostData.start2DTris + nrOf2DTris;
+    hostData.start3DTris = hostData.end2DTris;
+    hostData.end3DTris = hostData.start3DTris + nrOf3DTris;
 
     if (verbose)
         std::cout << "Deg. tris: " << nrOf0DTris << ", 1D tris: " << nrOf1DTris 
@@ -598,9 +600,9 @@ template <class Node> void calcTriangleClassification(
 ///
 /// \tparam Node Type of \p Node used.
 ///
-/// \param[in,out] devContext Reference to all relevant, device-specific 
+/// \param[in,out] devData Reference to all relevant, device-specific 
 ///                           variables.
-/// \param[in] hostContext Reference to all relevant non device-specific 
+/// \param[in] hostData Reference to all relevant non device-specific 
 ///                        variables.
 /// \param[in] subSpace The bounding box for the subspace that is to be 
 ///                     voxelized.
@@ -610,22 +612,28 @@ template <class Node> void calcTriangleClassification(
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node> 
 void calcOptSurfaceVoxelization(
-    DevContext<Node>    & devContext, 
-    HostContext   const & hostContext, 
-    Bounds<uint3> const & subSpace,
-    int                   gridType,
-    clock_t               startTime, 
-    bool                  verbose )
+    CommonDevData  const & devData, 
+    CommonHostData const & hostData, 
+    float                * vertices_gpu, 
+    uint                 * indices_gpu, 
+    uint                 * triangleTypes_gpu,
+    uint                 * sortedTriangles_gpu, 
+    uchar                * materials_gpu, 
+    Node                 * nodes_gpu, 
+    Bounds<uint3>  const & subSpace,
+    int                    gridType,
+    clock_t                startTime, 
+    bool                   verbose )
 {
-    uint blocks = devContext.blocks;
-    uint threadsPerBlock = devContext.threads;
+    uint blocks = devData.blocks;
+    uint threadsPerBlock = devData.threads;
 
-    float3 modelBBMin = make_float3( float(devContext.extMinVertex.x), 
-                                     float(devContext.extMinVertex.y), 
-                                     float(devContext.extMinVertex.z) );
+    float3 modelBBMin = make_float3( float(devData.extMinVertex.x), 
+                                     float(devData.extMinVertex.y), 
+                                     float(devData.extMinVertex.z) );
 
     // Process and voxelize triangles with a 1-dimensional bounding box.
-    if (hostContext.start1DTris != hostContext.end1DTris) 
+    if (hostData.start1DTris != hostData.end1DTris) 
     {
         if (verbose) 
             std::cout << (clock() - startTime) << 
@@ -635,27 +643,27 @@ void calcOptSurfaceVoxelization(
 
         process1DTriangles<Node>
             <<< blocks, 
-                threadsPerBlock >>>( devContext.vertices_gpu.get(), 
-                                     devContext.indices_gpu.get(), 
-                                     devContext.triangleTypes_gpu.get(),
-                                     devContext.sortedTriangles_gpu.get(), 
-                                     devContext.materials_gpu.get(), 
-                                     devContext.nodes_gpu.get(), 
-                                     hostContext.start1DTris,
-                                     hostContext.end1DTris,
-                                     devContext.left,
-                                     devContext.right,
-                                     devContext.up,
-                                     devContext.down,
+                threadsPerBlock >>>( vertices_gpu, 
+                                     indices_gpu, 
+                                     triangleTypes_gpu,
+                                     sortedTriangles_gpu, 
+                                     materials_gpu, 
+                                     nodes_gpu, 
+                                     hostData.start1DTris,
+                                     hostData.end1DTris,
+                                     devData.left,
+                                     devData.right,
+                                     devData.up,
+                                     devData.down,
                                      modelBBMin, 
-                                     float(hostContext.voxelLength),
-                                     devContext.extResolution,
+                                     float(hostData.voxelLength),
+                                     devData.extResolution,
                                      subSpace,
                                      gridType );
     }
 
     // Process and voxelize triangles with a 2-dimensional bounding box.
-    if (hostContext.start2DTris != hostContext.end2DTris) 
+    if (hostData.start2DTris != hostData.end2DTris) 
     {
         if (verbose) 
             std::cout << (clock() - startTime) << 
@@ -665,27 +673,27 @@ void calcOptSurfaceVoxelization(
 
         process2DTriangles<Node>
             <<< blocks, 
-                threadsPerBlock >>>( devContext.vertices_gpu.get(), 
-                                     devContext.indices_gpu.get(), 
-                                     devContext.triangleTypes_gpu.get(),
-                                     devContext.sortedTriangles_gpu.get(), 
-                                     devContext.materials_gpu.get(), 
-                                     devContext.nodes_gpu.get(), 
-                                     hostContext.start2DTris,
-                                     hostContext.end2DTris,
-                                     devContext.left,
-                                     devContext.right,
-                                     devContext.up,
-                                     devContext.down,
+                threadsPerBlock >>>( vertices_gpu, 
+                                     indices_gpu, 
+                                     triangleTypes_gpu,
+                                     sortedTriangles_gpu, 
+                                     materials_gpu, 
+                                     nodes_gpu, 
+                                     hostData.start2DTris,
+                                     hostData.end2DTris,
+                                     devData.left,
+                                     devData.right,
+                                     devData.up,
+                                     devData.down,
                                      modelBBMin, 
-                                     float(hostContext.voxelLength),
-                                     devContext.extResolution,
+                                     float(hostData.voxelLength),
+                                     devData.extResolution,
                                      subSpace,
                                      gridType );
     }
 
     // Process and voxelize triangles with a 3-dimensional bounding box.
-    if (hostContext.start3DTris != hostContext.end3DTris) 
+    if (hostData.start3DTris != hostData.end3DTris) 
     {
         if (verbose) 
             std::cout << (clock() - startTime) << 
@@ -695,21 +703,21 @@ void calcOptSurfaceVoxelization(
 
         process3DTriangles<Node>
             <<< blocks, 
-                threadsPerBlock >>>( devContext.vertices_gpu.get(), 
-                                     devContext.indices_gpu.get(), 
-                                     devContext.triangleTypes_gpu.get(),
-                                     devContext.sortedTriangles_gpu.get(), 
-                                     devContext.materials_gpu.get(), 
-                                     devContext.nodes_gpu.get(), 
-                                     hostContext.start3DTris,
-                                     hostContext.end3DTris,
-                                     devContext.left,
-                                     devContext.right,
-                                     devContext.up,
-                                     devContext.down,
+                threadsPerBlock >>>( vertices_gpu, 
+                                     indices_gpu, 
+                                     triangleTypes_gpu,
+                                     sortedTriangles_gpu, 
+                                     materials_gpu, 
+                                     nodes_gpu, 
+                                     hostData.start3DTris,
+                                     hostData.end3DTris,
+                                     devData.left,
+                                     devData.right,
+                                     devData.up,
+                                     devData.down,
                                      modelBBMin, 
-                                     float(hostContext.voxelLength),
-                                     devContext.extResolution,
+                                     float(hostData.voxelLength),
+                                     devData.extResolution,
                                      subSpace,
                                      gridType );
     }
@@ -724,7 +732,7 @@ void calcOptSurfaceVoxelization(
 ///
 /// \tparam Node Type of \p Node used.
 ///
-/// \param[in,out] devContext Reference to all relevant, device-specific 
+/// \param[in,out] devData Reference to all relevant, device-specific 
 ///                           variables.
 /// \param[in] xSlicing \p true if slicing along the x-axis, \p false in all 
 ///                     other cases.
@@ -732,23 +740,26 @@ void calcOptSurfaceVoxelization(
 /// \param[in] verbose Whether or not to print what is being done.
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node>
-void makePaddingZero( DevContext<Node> & devContext,
-                           bool         xSlicing,
-                           clock_t      startTime,
-                           bool         verbose )
+void makePaddingZero( CommonDevData const & devData,
+                      Node                * nodes_gpu,
+                      Node                * nodesCopy_gpu,
+                      bool                  xSlicing,
+                      clock_t               startTime,
+                      bool                  verbose )
 {
-    int blocks = devContext.blocks;
-    int threads = devContext.threads;
+    int blocks = devData.blocks;
+    int threads = devData.threads;
+
     if (verbose) 
         std::cout << (clock() - startTime) << ": Calling zeroPadding<<<" << 
                 blocks << ", " << threads << ">>> on device " << 
-                devContext.dev << "\n";
+                devData.dev << "\n";
 
-    uint3 dimensions = devContext.allocResolution.max -
-                       devContext.allocResolution.min;
+    uint3 dimensions = devData.allocResolution.max -
+                       devData.allocResolution.min;
 
-    Node * nPtr = xSlicing ? devContext.nodesCopy_gpu.get() : 
-                             devContext.nodes_gpu.get();
+    Node * nPtr = xSlicing ? nodesCopy_gpu : 
+                             nodes_gpu;
     zeroPadding<<< blocks, threads >>>( nPtr, dimensions );
 
     checkCudaErrors( "makePaddingZero" );
@@ -761,7 +772,7 @@ void makePaddingZero( DevContext<Node> & devContext,
 ///
 /// \tparam Node Type of \p Node used.
 ///
-/// \param[in,out] devContext Reference to all relevant, device-specific 
+/// \param[in,out] devData Reference to all relevant, device-specific 
 ///                           variables.
 /// \param[in] yzSubSpace The bounding box for the subspace that is to be 
 ///                       voxelized.
@@ -769,13 +780,15 @@ void makePaddingZero( DevContext<Node> & devContext,
 /// \param[in] verbose Whether or not to print what is being done.
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node>
-void restoreRotatedNodes( DevContext<Node>          & devContext,
-                               Bounds<uint2> const & yzSubSpace,
-                               clock_t               startTime,
-                               bool                  verbose )
+void restoreRotatedNodes( CommonDevData const & devData,
+                          Node                * nodes_gpu,
+                          Node                * nodesCopy_gpu,
+                          Bounds<uint2> const & yzSubSpace,
+                          clock_t               startTime,
+                          bool                  verbose )
 {
-    uint blocks = devContext.blocks;
-    uint threadsPerBlock = devContext.threads;
+    uint blocks = devData.blocks;
+    uint threadsPerBlock = devData.threads;
 
     if (verbose) 
         std::cout << (clock() - startTime) << ": Calling restoreRotatedNodes"
@@ -783,9 +796,9 @@ void restoreRotatedNodes( DevContext<Node>          & devContext,
                      yzSubSpace.min.x << ", " << yzSubSpace.min.y << ")\n";
     
     unRotateNodes<Node>
-        <<< blocks, threadsPerBlock >>>( devContext.nodes_gpu.get(), 
-                                         devContext.nodesCopy_gpu.get(),
-                                         devContext.allocResolution,
+        <<< blocks, threadsPerBlock >>>( nodes_gpu, 
+                                         nodesCopy_gpu,
+                                         devData.allocResolution,
                                          yzSubSpace );
 
     checkCudaErrors( "restoreRotatedNodes" );
@@ -4847,25 +4860,20 @@ __global__ void zeroPadding
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node> void dummyFunction()
 {
-    DevContext<Node> dC;
-    HostContext hC;
+    CommonDevData dd;
+    CommonHostData hd;
     Bounds<uint2> ui2b;
     Bounds<uint3> ui3b;
 
-    sortWorkQueue<Node>( dC, 0, true );
-    compactWorkQueue<Node>( dC, 0, true );
-    calcTileOverlap( dC, hC, ui2b, 0, true );
-    calcWorkQueue<Node>( dC, hC, ui2b, 0, true );
-    calcVoxelization<Node>( dC, hC, ui3b, 0, true );
-    calcNodeList<Node>( dC, ui2b, 0, true );
-    launchConvertToFCCGrid( dC, ui2b, 0, 0, true );
-    procNodeList<Node>( dC, ui2b, true, 0, true );
-    launchCalculateFCCBoundaries<Node>( dC, ui2b, true, 0, true );
-    calcSurfaceVoxelization<Node>( dC, hC, 0, true );
-    calcTriangleClassification<Node>( dC, hC, 0, true );
-    calcOptSurfaceVoxelization<Node>( dC, hC, ui3b, 0, 0, true );
-    makePaddingZero( dC, true, 0, true );
-    restoreRotatedNodes( dC, ui2b, 0, true );
+    calcNodeList<Node>( dd, 0, 0, ui2b, 0, true );
+    launchConvertToFCCGrid<Node>( dd, 0, 0, ui2b, 0, 0, true );
+    procNodeList<Node>( dd, 0, 0, 0, ui2b, true, 0, true );
+    launchCalculateFCCBoundaries<Node>( dd, 0, 0, ui2b, true, 0, true );
+    calcSurfaceVoxelization<Node>( dd, hd, 0, 0, 0, 0, 0, true );
+    calcOptSurfaceVoxelization<Node>( dd, hd, 0, 0, 0, 0, 0, 0, ui3b, 0
+                                    , 0, true );
+    makePaddingZero<Node>( dd, 0, 0, true, 0, true );
+    restoreRotatedNodes<Node>( dd, 0, 0, ui2b, 0, true );
 }
 ///////////////////////////////////////////////////////////////////////////////
 /// \brief "Uses" functions with every \p Node type to force the compiler to 
@@ -4882,6 +4890,18 @@ void masterDummyFunction()
     dummyFunction<PartialNode>();
     dummyFunction<ShortFCCNode>();
     dummyFunction<LongFCCNode>();
+
+    CommonDevData dd;
+    CommonHostData hd;
+    Bounds<uint2> ui2b;
+    Bounds<uint3> ui3b;
+
+    sortWorkQueue( dd, 0, 0, 0, true );
+    compactWorkQueue( dd, 0, 0, 0, 0, true );
+    calcTileOverlap( dd, hd, 0, 0, 0, ui2b, 0, true );
+    calcWorkQueue( dd, hd, 0, 0, 0, 0, 0, ui2b, 0, true );
+    calcVoxelization( dd, hd, 0, 0, 0, 0, 0, 0, 0, ui3b, 0, true );
+    calcTriangleClassification( dd, hd, 0, 0, 0, 0, 0, true );
 }
 
 } // End namespace vox

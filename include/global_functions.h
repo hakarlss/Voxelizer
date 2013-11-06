@@ -5,94 +5,141 @@
 
 namespace vox {
 
-
 /// Sorts the work queue by tile id.
-template <class Node>
-void sortWorkQueue( DevContext<Node>	& devContext, 
-                    clock_t		  startTime, 
-                    bool		  verbose );
+void sortWorkQueue(
+    CommonDevData const & devData,
+    uint                * workQueueTriangles_gpu,
+    uint                * workQueueTiles_gpu,
+    clock_t	              startTime, 
+    bool		          verbose );
 /// Compacts the work queue by removing duplicate tiles.
-template <class Node>
-void compactWorkQueue( DevContext<Node> & devContext, 
-                       clock_t		startTime, 
-                       bool			verbose );
+void compactWorkQueue(
+    CommonDevData & devData,
+    uint          * workQueueTiles_gpu,
+    uint          * tileList_gpu,
+    uint          * tileOffsets_gpu,
+    clock_t		    startTime, 
+    bool	        verbose );
 /// Calculates the number of overlapping tiles for each triangle.
-template <class Node>
-void calcTileOverlap( DevContext<Node>		  & devContext, 
-                      HostContext   const & hostContext, 
-                      Bounds<uint2> const & yzSubSpace, 
-                      clock_t				startTime, 
-                      bool					verbose );
+void calcTileOverlap(
+    CommonDevData  const & devData,
+    CommonHostData const & hostData,
+    float                * vertices_gpu,
+    uint                 * indices_gpu,
+    uint                 * tileOverlaps_gpu,
+    Bounds<uint2>  const & yzSubSpace, 
+    clock_t				   startTime, 
+    bool				   verbose );
 /// Generates the work queue.
-template <class Node>
-void calcWorkQueue( DevContext<Node>		    & devContext, 
-                    HostContext   const & hostContext, 
-                    Bounds<uint2> const & yzSubSpace, 
-                    clock_t				  startTime, 
-                    bool				  verbose );
+void calcWorkQueue(
+    CommonDevData  const & devData,
+    CommonHostData const & hostData,
+    float                * vertices_gpu,
+    uint                 * indices_gpu,
+    uint                 * workQueueTriangles_gpu,
+    uint                 * workQueueTiles_gpu,
+    uint                 * offsetBuffer_gpu,
+    Bounds<uint2>  const & yzSubSpace,
+    clock_t			       startTime, 
+    bool				   verbose );
 /// Generates the grid of integers representing voxels.
-template <class Node>
-void calcVoxelization( DevContext<Node>		   & devContext, 
-                       HostContext   const & hostContext, 
-                       Bounds<uint3> const & subSpace, 
-                       clock_t				 startTime, 
-                       bool					 verbose );
+void calcVoxelization(
+    CommonDevData  const & devData,
+    CommonHostData const & hostData,
+    float                * vertices_gpu,
+    uint                 * indices_gpu,
+    uint                 * workQueueTriangles_gpu,
+    uint                 * workQueueTiles_gpu,
+    uint                 * tileList_gpu,
+    uint                 * tileOffsets_gpu,
+    VoxInt               * voxels_gpu,
+    Bounds<uint3>  const & subSpace, 
+    clock_t                startTime, 
+    bool				   verbose );
 /// Performs a simple translation from the integer based voxelization to nodes.
-template <class Node>
-void calcNodeList( DevContext<Node>          & devContext, 
-                   Bounds<uint2> const & yzSubSpace, 
-                   clock_t				 startTime, 
-                   bool					 verbose );
+template <class Node> void calcNodeList(
+    CommonDevData  const & devData,
+    VoxInt               * voxels_gpu,
+    Node                 * nodes_gpu,
+    Bounds<uint2>  const & yzSubSpace, 
+    clock_t				   startTime, 
+    bool				   verbose );
 /// Translates an integer-based voxelization to a grid of <tt>FCC Nodes</tt>.
 template <class Node> void launchConvertToFCCGrid(
-    DevContext<Node>          & devContext, 
+    CommonDevData const & devData, 
+    VoxInt              * voxels_gpu,
+    Node                * nodes_gpu,
     Bounds<uint2> const & yzSubSpace, 
     int                   gridType,
     clock_t				  startTime, 
     bool				  verbose );
 /// Calculates the boundary ids of each node.
-template <class Node>
-void procNodeList( DevContext<Node> & devContext, 
-                   Bounds<uint2> const & yzSubSpace,
-                   bool                  xSlicing,
-                   clock_t               startTime, 
-                   bool                  verbose );
+template <class Node> void procNodeList(
+    CommonDevData const & devData, 
+    Node                * nodes_gpu,
+    Node                * nodesCopy_gpu,
+    bool                * error_gpu,
+    Bounds<uint2> const & yzSubSpace,
+    bool                  xSlicing,
+    clock_t				  startTime, 
+    bool				  verbose );
 /// Calculates the boundary ids of each FCC node.
-template <class Node>
-void launchCalculateFCCBoundaries( DevContext<Node> & DevContext
-                                 , Bounds<uint2> const & yzSubSpace
-                                 , bool                  xSlicing
-                                 , clock_t               startTime
-                                 , bool                  verbose );
+template <class Node> void launchCalculateFCCBoundaries(
+    CommonDevData const & devData, 
+    Node                * nodes_gpu,
+    Node                * nodesCopy_gpu,
+    Bounds<uint2> const & yzSubSpace,
+    bool                  xSlicing,
+    clock_t				  startTime, 
+    bool				  verbose );
 /// Uses the simple surface voxelizer to produce a surface voxelizaiton.
-template <class Node>
-void calcSurfaceVoxelization( DevContext<Node>        & devContext, 
-                              HostContext const & hostContext, 
-                              clock_t             startTime, 
-                              bool                verbose );
+template <class Node> void calcSurfaceVoxelization(
+    CommonDevData  const & devData, 
+    CommonHostData const & hostData, 
+    float                * vertices_gpu, 
+    uint                 * indices_gpu, 
+    Node                 * nodes_gpu, 
+    uchar                * materials_gpu, 
+    clock_t				   startTime, 
+    bool				   verbose );
 /// Classifies the triangles according to their bounding box.
-template <class Node>
-void calcTriangleClassification( DevContext<Node>        & devContext, 
-                                 HostContext       & hostContext, 
-                                 clock_t             startTime, 
-                                 bool                verbose );
+void calcTriangleClassification(
+    CommonDevData  const & devData, 
+    CommonHostData       & hostData, 
+    float                * vertices_gpu, 
+    uint                 * indices_gpu, 
+    uint                 * triangleTypes_gpu,
+    uint                 * sortedTriangles_gpu,
+    clock_t		           startTime, 
+    bool		           verbose );
 /// Calculates a surface voxelization with the optimized surface voxelizer.
-template <class Node>
-void calcOptSurfaceVoxelization( DevContext<Node>          & devContext, 
-                                 HostContext   const & hostContext, 
-                                 Bounds<uint3> const & subSpace,
-                                 int                   gridType,
-                                 clock_t               startTime, 
-                                 bool                  verbose );
+template <class Node> 
+void calcOptSurfaceVoxelization(
+    CommonDevData  const & devData, 
+    CommonHostData const & hostData, 
+    float                * vertices_gpu, 
+    uint                 * indices_gpu, 
+    uint                 * triangleTypes_gpu,
+    uint                 * sortedTriangles_gpu, 
+    uchar                * materials_gpu, 
+    Node                 * nodes_gpu, 
+    Bounds<uint3>  const & subSpace,
+    int                    gridType,
+    clock_t                startTime, 
+    bool                   verbose );
 /// Makes the outermost nodes of the array zero.
 template <class Node>
-void makePaddingZero( DevContext<Node> & devContext,
-                      bool         xSlicing,
-                      clock_t      startTime,
-                      bool         verbose );
+void makePaddingZero( CommonDevData const & devData,
+                      Node                * nodes_gpu,
+                      Node                * nodesCopy_gpu,
+                      bool                  xSlicing,
+                      clock_t               startTime,
+                      bool                  verbose );
 /// Undoes the rotation when slicing along the x-axis.
 template <class Node>
-void restoreRotatedNodes( DevContext<Node>          & devContext,
+void restoreRotatedNodes( CommonDevData const & devData,
+                          Node                * nodes_gpu,
+                          Node                * nodesCopy_gpu,
                           Bounds<uint2> const & yzSubSpace,
                           clock_t               startTime,
                           bool                  verbose );

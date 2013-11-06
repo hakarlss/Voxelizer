@@ -39,8 +39,11 @@ set( CMAKE_DEBUG_POSTFIX "_d" )
 set( CUDA_NVCC_FLAGS_RELEASE ${CUDA_NVCC_FLAGS_RELEASE};-gencode arch=compute_30,code=sm_30 )
 set( CUDA_NVCC_FLAGS_DEBUG ${CUDA_NVCC_FLAGS_DEBUG};-gencode arch=compute_30,code=sm_30 )
 
-# C++ compiler flags
+# Unix-specific compiler flags
+if ( UNIX )
 set( CMAKE_CXX_FLAGS_RELEASE "-std=c++0x ${CMAKE_CXX_FLAGS_RELEASE}" )
+set( CMAKE_CXX_FLAGS_DEBUG "-std=c++0x ${CMAKE_CXX_FLAGS_DEBUG}" )
+endif ()
 
 message( STATUS "R Flags: ${CMAKE_CXX_FLAGS_RELEASE}" )
 	
