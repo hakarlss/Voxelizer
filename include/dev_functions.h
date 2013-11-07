@@ -7,6 +7,7 @@
 
 #include "clean_defs.h"
 #include "node_types.h"
+
 #include <cuda.h>
 
 namespace vox {
@@ -638,6 +639,10 @@ inline __host__ __device__
 }
 ///////////////////////////////////////////////////////////////////////////////
 /// \brief \p double2 element-wise division assignment.
+///
+/// \todo Try to find a way to deal with double back slashes in a way that 
+///       doesn't make the c++ preprocessor complain about multi-line 
+///       comments.
 ///  
 /// \f$ \mathbf{\vec{a}} = \begin{bmatrix} a_{x} / b_{x} \\ 
 /// a_{y} / b_{y} \end{bmatrix} \f$.

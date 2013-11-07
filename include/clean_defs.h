@@ -5,9 +5,15 @@
 #ifndef CLEAN_DEFS_H
 #define CLEAN_DEFS_H
 
-#include <stdint.h>
+#if defined(unix) || defined(__unix__) || defined(__unix)
+#include <tr1/cstdint>
+#else
+#include <cstdint>
+#endif
+
 #include <cuda.h>
 #include <cuda_runtime.h>
+
 #include <exception>
 #include <string>
 

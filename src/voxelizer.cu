@@ -1,3 +1,8 @@
+#include "global_functions.h"
+#include "dev_functions.h"
+#include "helper_math.h"
+#include "clean_defs.h"
+
 #include <cuda_runtime_api.h>
 #include <device_functions.h>
 #include <device_launch_parameters.h>
@@ -6,11 +11,6 @@
 #include <sm_20_atomic_functions.h>
 #include <sm_35_atomic_functions.h>
 
-#include "global_functions.h"
-#include "dev_functions.h"
-#include "helper_math.h"
-
-#include <iostream>
 #include <thrust/host_vector.h>
 #include <thrust/functional.h>
 #include <thrust/device_vector.h>
@@ -19,7 +19,8 @@
 #include <thrust/unique.h>
 #include <thrust/count.h>
 
-#include <time.h>
+#include <iostream>
+#include <ctime>
 
 namespace vox {
 

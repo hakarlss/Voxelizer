@@ -6,6 +6,7 @@
 #define GLOBAL_FUNCTIONS_H
 
 #include "clean_defs.h"
+
 #include <cuda.h>
 
 namespace vox {

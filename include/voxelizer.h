@@ -855,7 +855,7 @@ public:
     /// Enables or disabeles material output.
     void setMaterialOutput( bool _materials ) throw();
     /// Enables or disables messages to the standard output stream.
-    void verboseOutput( bool verbose );
+    void verboseOutput( bool verbose ) throw();
     /// Calculates how large the \p Node array is going to be.
     uint3 getArrayDimensions( uint longestSizeInVoxels
                             , uint maxInternalXSize

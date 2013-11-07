@@ -391,9 +391,9 @@ public:
     ///////////////////////////////////////////////////////////////////////////
     static __host__ __device__ bool isFCCNode() { return false; }
 private:
-    float _r;       ///< \a Ratio of how much of the voxel is solid.
     uchar _bid;     ///< <em>Boundary id</em>.
     uchar _mat;     ///< <em>Material id</em>.
+    float _r;       ///< \a Ratio of how much of the voxel is solid.
 };
 ///////////////////////////////////////////////////////////////////////////////
 /// \brief A \p Node type that takes 2 bytes of memory and represents a \p Node 

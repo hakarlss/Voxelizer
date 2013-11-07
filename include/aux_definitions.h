@@ -7,6 +7,7 @@
 
 #include <cuda.h>
 #include <cuda_runtime.h>
+
 #include <exception>
 #include <string>
 #include <sstream>
@@ -62,7 +63,7 @@ struct Options
 /// \param[in] abort \p true to abort on any error, \p false to continue.
 ///////////////////////////////////////////////////////////////////////////////
 inline void gpuAssert( cudaError_t code
-                     , char * file
+                     , const char * file
                      , int line
                      , bool abort = true )
 {

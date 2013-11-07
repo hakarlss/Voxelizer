@@ -244,7 +244,7 @@ void Voxelizer<Node>::setMaterials(
 /// them.
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node> 
-void Voxelizer<Node>::setMaterialOutput( bool _materials )
+void Voxelizer<Node>::setMaterialOutput( bool _materials ) throw()
 {
     this->options.materials = _materials;
 }
@@ -910,7 +910,7 @@ void Voxelizer<Node>::voxelizeWorker(
 
     // Rename to a shorter name.
     Bounds<uint3> partition = device.data.resolution;
-    uint3 res = partition.max - partition.min; // Dimensions of the box.
+    //uint3 res = partition.max - partition.min; // Dimensions of the box.
 
     // Determine subspace neighborhoods.
     if ( partition.min.y == this->hostVars.resolution.min.y && 
@@ -1000,7 +1000,7 @@ void Voxelizer<Node>::voxelizeWorker(
         this->hostVars.minVertex.z + double(extPartition.min.z) * 
             this->hostVars.voxelLength );
 
-    uint3 extRes = extPartition.max - extPartition.min;
+    //uint3 extRes = extPartition.max - extPartition.min;
 
     // Split the subspace into further subspaces as demanded by the maximum 
     // voxelization size. These subsubspaces will be voxelized in sequence.
@@ -1059,7 +1059,7 @@ void Voxelizer<Node>::voxelizeWorker(
                                            , voxSplitRes.z ) 
                                , allocPartition );
 
-    uint nrOfNodes = allocRes.x * allocRes.y * allocRes.z;
+    //uint nrOfNodes = allocRes.x * allocRes.y * allocRes.z;
 
     if ( !this->options.slicePrepared )
         device.error_gpu.reset( 1, device.data.dev );
@@ -1116,7 +1116,6 @@ void Voxelizer<Node>::voxelizeWorker(
                                       , 1
                                       , this->startTime
                                       , this->options.verbose );
-            cudaDeviceProp devProps = device.data.devProps;
 
             // Because pending kernel calls execute so quickly after another, 
             // the device driver times out even though individual calls return 
@@ -1124,6 +1123,7 @@ void Voxelizer<Node>::voxelizeWorker(
             // synchronized every now and again to force CUDA to relinquish 
             // control over the device.
 #ifdef _WIN32
+            cudaDeviceProp devProps = device.data.devProps;
             if (devProps.kernelExecTimeoutEnabled > 0 && i % 2 == 0)
                 cudaDeviceSynchronize();
 #endif
@@ -1271,7 +1271,7 @@ void Voxelizer<Node>::fccWorker(
 
     // Rename to a shorter name.
     Bounds<uint3> partition = device.data.resolution;
-    uint3 res = partition.max - partition.min; // Dimensions of the box.
+    //uint3 res = partition.max - partition.min; // Dimensions of the box.
 
     // Determine subspace neighborhoods.
     if ( partition.min.y == this->hostVars.resolution.min.y && 
@@ -1362,7 +1362,7 @@ void Voxelizer<Node>::fccWorker(
         this->hostVars.minVertex.z + double(extPartition.min.z) * 
             this->hostVars.voxelLength );
 
-    uint3 extRes = extPartition.max - extPartition.min;
+    //uint3 extRes = extPartition.max - extPartition.min;
 
     // Split the subspace into further subspaces as demanded by the maximum 
     // voxelization size. These subsubspaces will be voxelized in sequence.
@@ -1406,17 +1406,16 @@ void Voxelizer<Node>::fccWorker(
                                            , voxSplitRes.z ) 
                                , allocPartition );
 
-    uint nrOfNodes = 4 * allocRes.x * allocRes.y * allocRes.z;
+    //uint nrOfNodes = 4 * allocRes.x * allocRes.y * allocRes.z;
 
-    /*
-    if ( !this->options.slicePrepared ) {
-        this->mmgr->allocHost( &device.error, 1, "Error bool" );
-        this->mmgr->allocDevice( &device.error_gpu
-                               , 1
-                               , device
-                               , "Error bool" );
-    }
-    */
+    
+    //if ( !this->options.slicePrepared ) {
+    //    this->mmgr->allocHost( &device.error, 1, "Error bool" );
+    //    this->mmgr->allocDevice( &device.error_gpu
+    //                           , 1
+    //                           , device
+    //                           , "Error bool" );
+    //}
 
     device.nodes_gpu.zero();
 
@@ -1568,7 +1567,6 @@ void Voxelizer<Node>::fccWorker(
                                                      : gridType
                                           , this->startTime
                                           , this->options.verbose );
-                cudaDeviceProp devProps = device.data.devProps;
 
                 // Because pending kernel calls execute so quickly after 
                 // another, the device driver times out even though individual 
@@ -1577,6 +1575,7 @@ void Voxelizer<Node>::fccWorker(
                 // CUDA to relinquish control over the device. Seems to be a 
                 // Windows issue.
 #ifdef _WIN32
+                cudaDeviceProp devProps = device.data.devProps;
                 if (devProps.kernelExecTimeoutEnabled > 0 && i % 2 == 0)
                     cudaDeviceSynchronize();
 #endif
@@ -1584,15 +1583,13 @@ void Voxelizer<Node>::fccWorker(
         }
     }
 
-    /*
-    cudaMemcpy( device.nodesCopy_gpu.get()
-              , device.nodes_gpu.get()
-              , device.nodes_gpu.bytes()
-              , cudaMemcpyDeviceToDevice );
-    
-    
-    return;
-    */
+    //cudaMemcpy( device.nodesCopy_gpu.get()
+    //          , device.nodes_gpu.get()
+    //          , device.nodes_gpu.bytes()
+    //          , cudaMemcpyDeviceToDevice );
+    //
+    //
+    //return;
     
     // If slicing along the x-direction, undo the rotation of the model.
     if ( this->options.slices && this->options.sliceDirection == 0 ) {
@@ -2656,14 +2653,13 @@ void Voxelizer<Node>::prepareForConstructWorkQueue( DevContext<Node> & device )
 template <class Node> 
 void Voxelizer<Node>::openLog( char const * filename )
 {
-    this->log.open(filename, std::ios::out | std::ios::trunc);
-    time_t rawtime;
-    time(&rawtime);
-    struct tm timeinfo; // = localtime(&rawtime);
-    localtime_s(&timeinfo, &rawtime);
-    char timeAndDate[50];
-    asctime_s(timeAndDate, 50*sizeof(char), &timeinfo);
+    this->log.open( filename, std::ios::out | std::ios::trunc );
+    std::time_t rawtime;
+    std::time( &rawtime );
+    struct std::tm * timeinfo = std::localtime( &rawtime );
+    char * timeAndDate = std::asctime(timeinfo);
     this->log << "Voxelizer logfile: " << timeAndDate;
+    free( timeAndDate );
 }
 ///////////////////////////////////////////////////////////////////////////////
 /// Automatically opens the logfile and writes general information about the 
@@ -3226,7 +3222,7 @@ boost::shared_array<Bounds<uint> > Voxelizer<Node>::splitResolutionByNrOfParts
 /// \param[in] verbose \p true to enable, \p false to disable verbose output.
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node>
-void Voxelizer<Node>::verboseOutput(bool verbose)
+void Voxelizer<Node>::verboseOutput(bool verbose) throw()
 {
     this->options.verbose = verbose;
 }
