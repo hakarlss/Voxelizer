@@ -1,4 +1,9 @@
+#ifdef _WIN32
 #pragma once
+#endif
+
+#ifndef DEV_FUNCTIONS_H
+#define DEV_FUNCTIONS_H
 
 #include "clean_defs.h"
 #include "node_types.h"
@@ -858,3 +863,5 @@ inline __host__ __device__
                        , a.x*b.y - a.y*b.x ); 
 }
 #endif // _DOUBLE2_DOUBLE3_MATH_
+
+#endif

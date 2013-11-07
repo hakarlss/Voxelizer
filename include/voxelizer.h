@@ -1,4 +1,9 @@
+#ifdef _WIN32
 #pragma once
+#endif
+
+#ifndef VOXELIZER_H
+#define VOXELIZER_H
 
 ///////////////////////////////////////////////////////////////////////////////
 /// \mainpage Voxelizer documentation
@@ -633,8 +638,11 @@
 #include <ctime>
 #include <fstream>
 #include <vector>
-#include <memory>
-#include <functional>
+
+#include <boost/function.hpp>
+
+#include <boost/scoped_array.hpp>
+#include <boost/shared_array.hpp>
 
 ///////////////////////////////////////////////////////////////////////////////
 /// \brief Root namespace of the Voxelizer library.
@@ -714,12 +722,12 @@ public:
     ~Voxelizer() {};
 
     /// Voxelize into an integer representation, returning device pointer(s).
-    std::vector<NodePointer<Node>> voxelize( 
+    std::vector<NodePointer<Node> > voxelize( 
         uint maxDimension = 256, 
         uint2 devConfig = make_uint2( 1, 1 ), 
         uint3 voxSplitRes = make_uint3( 1024, 512, 512 ) );
     /// Voxelize into an integer representation, returning device pointer(s).
-    std::vector<NodePointer<Node>> voxelize( 
+    std::vector<NodePointer<Node> > voxelize( 
         double cubeLength, 
         uint2 devConfig = make_uint2( 1, 1 ), 
         uint3 voxSplitRes = make_uint3( 1024, 512, 512 ) );
@@ -732,13 +740,13 @@ public:
         double cubeLength, 
         uint3 voxSplitRes = make_uint3( 1024, 512, 512 ) );
     /// Voxelizes into a \p Node representation, returning device pointer(s).
-    std::vector<NodePointer<Node>> 
+    std::vector<NodePointer<Node> > 
         voxelizeToNodes( uint maxDimension = 256
                        , uint2 devConfig = make_uint2( 1, 1 )
                        , uint3 voxSplitRes = make_uint3( 1024, 512, 512 )
                        , uint3 matSplitRes = make_uint3( 512, 512, 512 ) );
     /// Voxelizes into a \p Node representation, returning device pointer(s).
-    std::vector<NodePointer<Node>> 
+    std::vector<NodePointer<Node> > 
         voxelizeToNodes( double cubeLength
                        , uint2 devConfig = make_uint2( 1, 1 )
                        , uint3 voxSplitRes = make_uint3( 1024, 512, 512 )
@@ -756,7 +764,7 @@ public:
             uint3 voxSplitRes = make_uint3( 1024, 512, 512 ),
             uint3 matSplitRes = make_uint3( 512, 512, 512 ) );
     /// Voxelize one 2D slice at a time, returning device pointers.
-    std::vector<NodePointer<Node>> 
+    std::vector<NodePointer<Node> > 
         voxelizeSlice( uint  maxDimension
                      , int   direction
                      , uint  slice
@@ -764,7 +772,7 @@ public:
                      , uint2 voxSplitRes = make_uint2( 1024, 512 )
                      , uint2 matSplitRes = make_uint2( 512, 512 ) );
     /// Voxelize one 2D slice at a time, returning device pointers.
-    std::vector<NodePointer<Node>> 
+    std::vector<NodePointer<Node> > 
         voxelizeSlice( double cubeLength
                      , int   direction
                      , uint  slice
@@ -857,19 +865,21 @@ public:
                             , uint maxInternalXSize
                             , bool sliceAlongX );
     /// Simulates multiple devices on the CPU and returns host pointers.
-    std::vector<NodePointer<Node>> simulateMultidevice( 
-        std::function<std::vector<NodePointer<Node>>()> func );
+    std::vector<NodePointer<Node> > simulateMultidevice( 
+        boost::function<std::vector<NodePointer<Node> >()> func );
 
 private:
-    typedef std::unique_ptr<DevContext<Node>> Device; ///< Single device.
+    /// Array of DevContexts.
+    typedef boost::scoped_array<DevContext<Node> > Devices;
 
     // Variable declarations.
 
     const int defaultDevice;       ///< Default device id. Should be 0.
     int nrOfDevices;               ///< Number of devices on the system.
+    int nrOfDevicesInUse;          ///< How many devices are being used.
 
     CommonHostData hostVars;       ///< Host variables.
-    std::vector<Device> devices;   ///< Device-specific vars.
+    Devices devices;               ///< Device-specific vars.
 
     Options options;               ///< \p Options for the voxelization.
 
@@ -905,27 +915,27 @@ private:
     /// Calculates the <em>offset buffer</em>
     void prepareForConstructWorkQueue( DevContext<Node> & device );
     /// Splits a space into subspaces by constraining each direction.
-    std::pair<uint3, std::unique_ptr<Bounds<uint3>[]>> 
+    SplitData<uint3>
         splitResolutionByMaxDim( uint3 const & maxDimensions
                                , Bounds<uint3> const & resolution );
     /// Splits an area into subareas by constraining each direction.
-    std::pair<uint2,std::unique_ptr<Bounds<uint2>[]>>  
+    SplitData<uint2>
         splitResolutionByMaxDim( uint2 const & maxDimensions
                                , Bounds<uint3> const & resolution );
     /// Splits a line into sublines by constraining the lengths of each line.
-    std::pair<uint, std::unique_ptr<Bounds<uint>[]>> 
+    SplitData<uint>
         splitResolutionByMaxDim( uint maxDimension
                                , Bounds<uint3> const & resolution );
     /// Splits a space into similarly sized subspaces.
-    std::unique_ptr<Bounds<uint3>[]>
+    boost::shared_array<Bounds<uint3> >
         splitResolutionByNrOfParts( uint3 const & nrOfPartitions
                                   , Bounds<uint3> const & resolution );
     /// Splits an area into similarly sized subareas.
-    std::unique_ptr<Bounds<uint2>[]>
+    boost::shared_array<Bounds<uint2> >
         splitResolutionByNrOfParts( uint2 const & nrOfPartitions
                                   , Bounds<uint3> const & resolution );
     /// Splits a line into a given number of similarly sized lines.
-    std::unique_ptr<Bounds<uint>[]>
+    boost::shared_array<Bounds<uint> >
         splitResolutionByNrOfParts( uint nrOfPartitions
                                   , Bounds<uint3> const & resolution );
     /// Performs a plain voxelization with the given settings.
@@ -984,7 +994,7 @@ private:
     /// Resets certain data structures to their default values.
     void resetDataStructures( DevContext<Node> & device );
     /// Constructs the <tt>vector<NodePointer></tt> returnable.
-    std::vector<NodePointer<Node>> collectData();
+    std::vector<NodePointer<Node> > collectData();
     /// Constructs the \p NodePointer returnable.
     NodePointer<Node> collectData( DevContext<Node> & device
                                  , const bool hostPointers );
@@ -994,3 +1004,5 @@ private:
 
 #include "global_functions.h"
 #include "dev_functions.h"
+
+#endif

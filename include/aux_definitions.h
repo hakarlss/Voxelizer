@@ -1,21 +1,38 @@
+#ifdef _WIN32
 #pragma once
+#endif
+
+#ifndef AUX_DEFINITIONS_H
+#define AUX_DEFINITIONS_H
 
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <exception>
 #include <string>
+#include <sstream>
 
-//#include <map>
-//#include <iterator>
 #include <iostream>
-#include <memory>
 #include <vector>
+
+#include <boost/shared_array.hpp>
 
 #include "clean_defs.h"
 
 namespace vox {
 
-std::string to_string( int i ) { return std::to_string( (long long)i ); }
+template <typename T>
+std::string toString( T val )
+{ 
+    std::stringstream ss;
+    ss << val;
+    return ss.str();
+}
+
+template <typename T>
+boost::shared_array<T> make_shared( int count )
+{
+    return boost::shared_array<T>( new T[count]() );
+}
 
 /// Options or state-tracking variables for the voxelizer.
 struct Options
@@ -52,30 +69,13 @@ inline void gpuAssert( cudaError_t code
     if ( code != cudaSuccess )
     {
         std::string message = std::string( cudaGetErrorString( code ) ) + 
-            " in " + std::string( file ) + ", " + 
-            to_string( (long long)line );
+            " in " + std::string( file ) + ", " + toString( line );
 
         if ( abort ) throw Exception( message );
     }
 }
 /// Macro that embeds source information into the gpuAsser-function.
-#define GPU_ERRCHK(ans) vox::gpuAssert((ans), __FILE__, __LINE__)
-///////////////////////////////////////////////////////////////////////////////
-///
-///////////////////////////////////////////////////////////////////////////////
-template <typename T>
-std::unique_ptr<T> make_unique()
-{
-    return std::unique_ptr<T>( new T() );
-}
-///////////////////////////////////////////////////////////////////////////////
-///
-///////////////////////////////////////////////////////////////////////////////
-template <typename T>
-std::unique_ptr<T[]> make_unique( int count )
-{
-    return std::unique_ptr<T[]>( new T[count]() );
-}
+#define GPU_ERRCHK(ans) gpuAssert((ans), __FILE__, __LINE__)
 ///////////////////////////////////////////////////////////////////////////////
 /// \brief <em>Unique smart pointer</em> implementation for CUDA memory.
 ///
@@ -91,7 +91,7 @@ class DevPtr
 {
 public:
     /// Default constructor.
-    DevPtr() throw(): _ptr( nullptr ), _bytes( 0 ), _device( 0 ) {}
+    DevPtr() throw(): _ptr( NULL ), _bytes( 0 ), _device( 0 ) {}
     ///////////////////////////////////////////////////////////////////////////
     /// \brief Constructor that allocates memory.
     ///
@@ -103,7 +103,7 @@ public:
     /// \param[in] device Which device the memory should be allocated on.
     ///////////////////////////////////////////////////////////////////////////
     DevPtr( std::size_t count, int device )
-          : _ptr( nullptr ), _bytes( sizeof(T)*count ), _device( device )
+          : _ptr( NULL ), _bytes( sizeof(T)*count ), _device( device )
     {
         try { allocate(); }
         catch ( ... ) { GPU_ERRCHK( cudaFree( _ptr ) ); throw; }
@@ -123,40 +123,10 @@ public:
           : _ptr( ptr ), _bytes( sizeof(T)*count ), _device ( device )
     {
     }
-    ///////////////////////////////////////////////////////////////////////////
-    /// \brief Move constructor.
-    ///
-    /// Simply swaps all data between \p this and \p rhs.
-    ///
-    /// \param[in,out] rhs The \p DevPtr which should be moved to \p this.
-    ///////////////////////////////////////////////////////////////////////////
-    DevPtr( DevPtr<T> && rhs ) throw()
-    {
-        std::swap( _ptr, rhs._ptr );
-        std::swap( _bytes, rhs._bytes );
-        std::swap( _device, rhs._device );
-    }
     /// Default destructor: Unallocates memory on card.
     ~DevPtr() throw()
     {
         try { unallocate(); } catch ( ... ) {}
-    }
-    ///////////////////////////////////////////////////////////////////////////
-    /// \brief Move-assignment operator.
-    ///
-    /// Simply swaps all data between \p this and \p rhs.
-    ///
-    /// \param[in,out] rhs The \p DevPtr which should be moved to \p this.
-    ///
-    /// \return Reference to \p this.
-    ///////////////////////////////////////////////////////////////////////////
-    DevPtr & operator=( DevPtr && rhs ) throw()
-    {
-        std::swap( _ptr, rhs._ptr );
-        std::swap( _bytes, rhs._bytes );
-        std::swap( _device, rhs._device );
-
-        return *this;
     }
     ///////////////////////////////////////////////////////////////////////////
     /// \brief Copies contents to the given destination.
@@ -294,7 +264,7 @@ public:
     {
         T * result = _ptr;
 
-        _ptr = nullptr;
+        _ptr = NULL;
 
         return result;
     }
@@ -346,7 +316,7 @@ private:
     ///////////////////////////////////////////////////////////////////////////
     void unallocate()
     {
-        if ( _ptr == nullptr )
+        if ( _ptr == NULL )
             return;
 
         int currentDevice;
@@ -361,7 +331,7 @@ private:
         else
             GPU_ERRCHK( cudaFree( _ptr ) );
 
-        _ptr = nullptr;
+        _ptr = NULL;
     }
 
     T * _ptr;            ///< Device pointer.
@@ -378,7 +348,9 @@ private:
 template <class Node>
 struct DevContext
 {
+    /// Default constructor.
     DevContext() {}
+    /// Default destructor.
     ~DevContext() {}
 
     // GPU pointers.
@@ -430,4 +402,13 @@ private:
     DevContext & operator=( const DevContext & rhs ) throw() { return *this; }
 };
 
+template <typename T>
+struct SplitData
+{
+    T counts;
+    boost::shared_array<Bounds<T> > splits;
+};
+
 } // End namespace vox
+
+#endif

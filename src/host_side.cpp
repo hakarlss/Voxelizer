@@ -9,8 +9,6 @@
 #include <boost/thread.hpp>
 #include <boost/bind.hpp>
 
-#include <iterator>
-
 namespace vox {
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -117,7 +115,7 @@ void Voxelizer<Node>::initVariables()
 template <class Node> 
 void Voxelizer<Node>::deallocate()
 {
-    this->devices.clear();
+    this->devices.reset();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -140,14 +138,14 @@ void Voxelizer<Node>::deallocateVoxelizationData( DevContext<Node> & device )
     device.tileList_gpu.reset();
     device.tileOffsets_gpu.reset();
 
-    // vector::shrink_to_fit() should deallocate its array, since the vector 
-    // should never have a size larger than zero.
-    device.tileOverlaps.shrink_to_fit();
-    device.offsetBuffer.shrink_to_fit();
-    device.workQueueTriangles.shrink_to_fit();
-    device.workQueueTiles.shrink_to_fit();
-    device.tileList.shrink_to_fit();
-    device.tileOffsets.shrink_to_fit();
+    // Replacing the vectors should cause them to be destructed, and 
+    // consequently have their allocated memory freed.
+    device.tileOverlaps = std::vector<uint>();
+    device.offsetBuffer = std::vector<uint>();
+    device.workQueueTriangles = std::vector<uint>();
+    device.workQueueTiles = std::vector<uint>();
+    device.tileList = std::vector<uint>();
+    device.tileOffsets = std::vector<uint>();
 }
 ///////////////////////////////////////////////////////////////////////////////
 /// Checks if the amount of requested devices can be satisfied and allocates
@@ -171,10 +169,10 @@ void Voxelizer<Node>::initDevices( uint nrOfUsedDevices )
         throw Exception( "Not enough devices to satisfy request.\n" );
 
     // Make as many DevContexts as there are devices being used.
-    this->devices.clear();
-    this->devices.resize( nrOfUsedDevices );
+    this->devices.reset( new DevContext<Node>[nrOfUsedDevices]() );
+    this->nrOfDevicesInUse = nrOfUsedDevices;
 
-    for ( int d = 0; d < this->devices.size(); ++d )
+    for ( int d = 0; d < this->nrOfDevicesInUse; ++d )
     {
         int dev = d;
 
@@ -183,17 +181,15 @@ void Voxelizer<Node>::initDevices( uint nrOfUsedDevices )
 
         cudaSetDevice(dev);
 
-        this->devices[d].reset( new DevContext<Node>() );
+        this->devices[d].data.dev = dev;
 
-        this->devices[d]->data.dev = dev;
-
-        cudaGetDeviceProperties( &this->devices[d]->data.devProps, 0 );
-        cudaMemGetInfo( &this->devices[d]->data.freeMem
-                      , &this->devices[d]->data.maxMem );
+        cudaGetDeviceProperties( &this->devices[d].data.devProps, 0 );
+        cudaMemGetInfo( &this->devices[d].data.freeMem
+                      , &this->devices[d].data.maxMem );
         
         // Blocks and threads are currently not optimized per device.
-        this->devices[d]->data.blocks = 64;
-        this->devices[d]->data.threads = 512;
+        this->devices[d].data.blocks = 64;
+        this->devices[d].data.threads = 512;
 
         checkCudaErrors( "initDevices" );
     }
@@ -232,8 +228,8 @@ void Voxelizer<Node>::setMaterials(
                           , _materials + this->hostVars.nrOfTriangles );
 
     // Free any old materials that may have been uploaded to the GPUs.
-    for ( int d = 0; d < this->devices.size(); ++d )
-        this->devices[d]->materials_gpu.reset();
+    for ( int d = 0; d < this->nrOfDevicesInUse; ++d )
+        this->devices[d].materials_gpu.reset();
 
     // Automatically enable the inclusion of material information to the 
     // output.
@@ -445,7 +441,7 @@ void Voxelizer<Node>::allocStaticMem( DevContext<Node> & device )
         device.materials_gpu.reset( this->hostVars.nrOfTriangles
                                   , device.data.dev );
 
-        device.materials_gpu.copyFrom( this->materials.data() );
+        device.materials_gpu.copyFrom( &this->materials[0] );
 
         device.triangleTypes_gpu.reset( this->hostVars.nrOfTriangles
                                       , device.data.dev );
@@ -469,9 +465,9 @@ void Voxelizer<Node>::allocStaticMem( DevContext<Node> & device )
     device.offsetBuffer_gpu.reset( this->hostVars.nrOfTriangles
                                  , device.data.dev );
 
-    device.vertices_gpu.copyFrom( this->vertices.data() );
+    device.vertices_gpu.copyFrom( &this->vertices[0] );
 
-    device.indices_gpu.copyFrom( this->indices.data() );
+    device.indices_gpu.copyFrom( &this->indices[0] );
 
     device.tileOverlaps.reserve( this->hostVars.nrOfTriangles );
     
@@ -557,12 +553,11 @@ void Voxelizer<Node>::reAllocDynamicMem(
 ///         other relevant information, such as the size of the array.
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node> 
-auto Voxelizer<Node>::voxelize( uint  maxDimension,
+std::vector<NodePointer<Node> >  Voxelizer<Node>::voxelize( uint  maxDimension,
                                 uint2 devConfig,
                                 uint3 voxSplitRes )
-    -> std::vector<NodePointer<Node>> 
 {
-    std::vector<NodePointer<Node>> result;
+    std::vector<NodePointer<Node> > result;
 
     if ( Node::isFCCNode() )
     {
@@ -614,12 +609,11 @@ auto Voxelizer<Node>::voxelize( uint  maxDimension,
 ///         other relevant information, such as the size of the array.
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node> 
-auto Voxelizer<Node>::voxelize( double cubeLength,
+std::vector<NodePointer<Node> >  Voxelizer<Node>::voxelize( double cubeLength,
                                 uint2 devConfig,
                                 uint3 voxSplitRes )
-    -> std::vector<NodePointer<Node>> 
 {
-    std::vector<NodePointer<Node>> result;
+    std::vector<NodePointer<Node> > result;
 
     if ( Node::isFCCNode() )
     {
@@ -724,7 +718,7 @@ void Voxelizer<Node>::voxelizeEntry(
 
     // Split along the x-direction to find out how many splits are needed.
     uint xSplits = splitResolutionByMaxDim( voxSplitRes.x  
-                                          , this->hostVars.resolution ).first;
+                                          , this->hostVars.resolution ).counts;
 
     if ( this->options.verbose )
         std::cout << "Split the x-resolution into " << xSplits << " parts.\n";
@@ -777,32 +771,33 @@ void Voxelizer<Node>::voxelizeEntry(
 
     // Subdivide the voxelization space according to the device configuration.
     {
-        auto parts = splitResolutionByNrOfParts( make_uint3( 1 
-                                                           , deviceConfig.x
-                                                           , deviceConfig.y )
-                                               , splittable );
+        boost::shared_array<Bounds<uint3> > parts = 
+            splitResolutionByNrOfParts( make_uint3( 1 
+                                                  , deviceConfig.x
+                                                  , deviceConfig.y )
+                                      , splittable );
 
         // Assign the different volumes to different devices.
-        for ( uint i = 0; i < this->devices.size(); ++i )
+        for ( int i = 0; i < this->nrOfDevicesInUse; ++i )
         {
             // The location of the subspace as a coordinate in an "array" of
             // subspaces. Relies on them being constructed in a certain order. 
             int y = i % deviceConfig.x;
             int z = i / deviceConfig.x;
 
-            this->devices[i]->data.location = make_uint3( 0, y, z );
+            this->devices[i].data.location = make_uint3( 0, y, z );
 
-            this->devices[i]->data.resolution = parts[i];
+            this->devices[i].data.resolution = parts[i];
 
             // Also update the minimum corners to reflect the new bounding box.
-            this->devices[i]->data.minVertex.x = this->hostVars.minVertex.x + 
-                double(this->devices[i]->data.resolution.min.x) * 
+            this->devices[i].data.minVertex.x = this->hostVars.minVertex.x + 
+                double(this->devices[i].data.resolution.min.x) * 
                 this->hostVars.voxelLength;
-            this->devices[i]->data.minVertex.y = this->hostVars.minVertex.y + 
-                double(this->devices[i]->data.resolution.min.y) * 
+            this->devices[i].data.minVertex.y = this->hostVars.minVertex.y + 
+                double(this->devices[i].data.resolution.min.y) * 
                 this->hostVars.voxelLength;
-            this->devices[i]->data.minVertex.z = this->hostVars.minVertex.z + 
-                double(this->devices[i]->data.resolution.min.z) * 
+            this->devices[i].data.minVertex.z = this->hostVars.minVertex.z + 
+                double(this->devices[i].data.resolution.min.z) * 
                 this->hostVars.voxelLength;
         }
     }
@@ -813,7 +808,16 @@ void Voxelizer<Node>::voxelizeEntry(
     this->startTime = clock();
 
     // The FCC voxelization uses a different worker function.
-    typename decltype( &Voxelizer<Node>::voxelizeWorker ) workerFunc;
+    //void (Voxelizer<Node>::*workerFunc)( uint, uint, uint3, uint3
+    //                                   , DevContext<Node> & );
+
+    boost::function<void ( Voxelizer<Node> * const voxelizer
+                         , uint xRes
+                         , uint xSplits
+                         , uint3 voxSplitRes
+                         , uint3 matSplitRes
+                         , DevContext<Node>& device )> workerFunc;
+
 
     if ( Node::isFCCNode() )
         workerFunc = &Voxelizer<Node>::fccWorker;
@@ -822,24 +826,27 @@ void Voxelizer<Node>::voxelizeEntry(
 
     if ( this->options.simulateMultidevice )
     {
-        for ( auto it = this->devices.begin()
-            ; it != this->devices.end()
-            ; ++it )
+        for ( int i = 0; i < this->nrOfDevicesInUse; ++i )
         {
-            (this->*workerFunc)( xRes
-                               , xSplits
-                               , voxSplitRes
-                               , matSplitRes
-                               , **it );
+            workerFunc( this
+                      , xRes
+                      , xSplits
+                      , voxSplitRes
+                      , matSplitRes
+                      , this->devices[i] );
+
+            //(this->*workerFunc)( xRes
+            //                 , xSplits
+            //                 , voxSplitRes
+            //                 , matSplitRes
+            //                 , **it );
         }
     }
     else
     {
         // If there are more than one device, launch new threads to process the 
         // additional devices.
-        for ( auto it = this->devices.begin() + 1
-            ; it != this->devices.end()
-            ; ++it )
+        for ( int i = 0; i < this->nrOfDevicesInUse; ++i )
         {
             threads.create_thread( boost::bind( workerFunc 
                                               , this
@@ -847,15 +854,18 @@ void Voxelizer<Node>::voxelizeEntry(
                                               , xSplits
                                               , voxSplitRes
                                               , matSplitRes
-                                              , boost::ref( **it ) ) );
+                                              , boost::ref( this->devices[i] ) 
+                                              ) 
+                                 );
         }
 
         // Process device 0 in the main thread.
-        (this->*workerFunc)( xRes
-                           , xSplits
-                           , voxSplitRes
-                           , matSplitRes
-                           , *this->devices[0] );
+        workerFunc( this
+                  , xRes
+                  , xSplits
+                  , voxSplitRes
+                  , matSplitRes
+                  , this->devices[0] );
 
         // Wait for all threads to finish.
         threads.join_all();
@@ -955,11 +965,11 @@ void Voxelizer<Node>::voxelizeWorker(
         // reallocate these.
         uint nrOfNodes = dim.x * dim.y * dim.z;
         if ( this->options.sliceDirection == 0 ) {
-            device.nodesCopy_gpu = DevPtr<Node>( nrOfNodes, device.data.dev );
+            device.nodesCopy_gpu.reset( nrOfNodes, device.data.dev );
         }
         else
         {
-            device.nodes_gpu = DevPtr<Node>( nrOfNodes, device.data.dev );
+            device.nodes_gpu.reset( nrOfNodes, device.data.dev );
         }
     }
 
@@ -994,9 +1004,10 @@ void Voxelizer<Node>::voxelizeWorker(
 
     // Split the subspace into further subspaces as demanded by the maximum 
     // voxelization size. These subsubspaces will be voxelized in sequence.
-    auto extYzSplits = splitResolutionByMaxDim( make_uint2( voxSplitRes.y
-                                                          , voxSplitRes.z ) 
-                                              , extPartition );
+    SplitData<uint2> extYzSplits = 
+        splitResolutionByMaxDim( make_uint2( voxSplitRes.y
+                                           , voxSplitRes.z ) 
+                               , extPartition );
 
     device.data.extResolution = extPartition;
 
@@ -1021,8 +1032,8 @@ void Voxelizer<Node>::voxelizeWorker(
     }
 
     // Perform voxelization.
-    for ( uint i = 0; i < extYzSplits.first.x * extYzSplits.first.y; ++i )
-        this->performVoxelization( extYzSplits.second[i]
+    for ( uint i = 0; i < extYzSplits.counts.x * extYzSplits.counts.y; ++i )
+        this->performVoxelization( extYzSplits.splits[i]
                                  , xRes
                                  , xSplits
                                  , device );
@@ -1043,25 +1054,26 @@ void Voxelizer<Node>::voxelizeWorker(
     Bounds<uint3> allocPartition = device.data.allocResolution;
     uint3 allocRes = allocPartition.max - allocPartition.min;
 
-    auto allocYzSplits = splitResolutionByMaxDim( make_uint2( voxSplitRes.y 
-                                                            , voxSplitRes.z ) 
-                                                , allocPartition );
+    SplitData<uint2> allocYzSplits = 
+        splitResolutionByMaxDim( make_uint2( voxSplitRes.y 
+                                           , voxSplitRes.z ) 
+                               , allocPartition );
 
     uint nrOfNodes = allocRes.x * allocRes.y * allocRes.z;
 
     if ( !this->options.slicePrepared )
-        device.error_gpu = DevPtr<bool>( 1, device.data.dev );
+        device.error_gpu.reset( 1, device.data.dev );
 
     device.nodes_gpu.zero();
 
     // Perform a simple translation from the integer representation to a Node 
     // representation. No materials or neighborhoods are calculated yet.
-    for ( uint i = 0; i < allocYzSplits.first.x * allocYzSplits.first.y; ++i )
+    for ( uint i = 0; i < allocYzSplits.counts.x * allocYzSplits.counts.y; ++i )
     {
         calcNodeList( device.data,
                       device.voxels_gpu.get(),
                       device.nodes_gpu.get(),
-                      allocYzSplits.second[i],
+                      allocYzSplits.splits[i],
                       this->startTime,
                       this->options.verbose );
     }
@@ -1084,11 +1096,12 @@ void Voxelizer<Node>::voxelizeWorker(
         // all three dimensions, instead of just two like in the plain 
         // voxelizer, there are performance pressures to use smaller spaces
         // when voxelizing. The division is done according to matSplitRes.
-        auto splits = this->splitResolutionByMaxDim( matSplitRes
-                                                   , extPartition );
+        SplitData<uint3> splits = 
+            this->splitResolutionByMaxDim( matSplitRes
+                                         , extPartition );
 
         for ( uint i = 0
-            ; i < splits.first.x * splits.first.y * splits.first.z
+            ; i < splits.counts.x * splits.counts.y * splits.counts.z
             ; ++i )
         {
             calcOptSurfaceVoxelization( device.data
@@ -1099,7 +1112,7 @@ void Voxelizer<Node>::voxelizeWorker(
                                       , device.sortedTriangles_gpu.get()
                                       , device.materials_gpu.get()
                                       , device.nodes_gpu.get()
-                                      , splits.second[i]
+                                      , splits.splits[i]
                                       , 1
                                       , this->startTime
                                       , this->options.verbose );
@@ -1124,12 +1137,12 @@ void Voxelizer<Node>::voxelizeWorker(
         // The two arrays are identical in size, but the node arrangement is 
         // different.
         for ( uint i = 0
-            ; i < allocYzSplits.first.x * allocYzSplits.first.y
+            ; i < allocYzSplits.counts.x * allocYzSplits.counts.y
             ; ++i )
             restoreRotatedNodes( device.data
                                , device.nodes_gpu.get()
                                , device.nodesCopy_gpu.get()
-                               , allocYzSplits.second[i]
+                               , allocYzSplits.splits[i]
                                , this->startTime
                                , this->options.verbose );
 
@@ -1157,7 +1170,9 @@ void Voxelizer<Node>::voxelizeWorker(
     
     // Calculate orientations. The algorithm should repeatedly call 
     // procNodeList while the error_gpu is true.
-    for ( uint i = 0; i < allocYzSplits.first.x * allocYzSplits.first.y; ++i )
+    for ( uint i = 0
+        ; i < allocYzSplits.counts.x * allocYzSplits.counts.y
+        ; ++i )
     {
         do
         {
@@ -1169,7 +1184,7 @@ void Voxelizer<Node>::voxelizeWorker(
                         , device.nodes_gpu.get()
                         , device.nodesCopy_gpu.get()
                         , device.error_gpu.get()
-                        , allocYzSplits.second[i]
+                        , allocYzSplits.splits[i]
                         , this->options.slices && 
                           this->options.sliceDirection == 0
                         , this->startTime 
@@ -1183,7 +1198,8 @@ void Voxelizer<Node>::voxelizeWorker(
     // Zero the padding. Since part of the border may contain nodes that 
     // overlap with another subspace, the entire border needs to be set to 
     // zero, unless there are no neighboring subspaces.
-    if ( device.data.left || device.data.right || device.data.up || device.data.down )
+    if ( device.data.left || device.data.right || 
+         device.data.up || device.data.down )
     {
         makePaddingZero( device.data
                        , device.nodes_gpu.get()
@@ -1350,9 +1366,10 @@ void Voxelizer<Node>::fccWorker(
 
     // Split the subspace into further subspaces as demanded by the maximum 
     // voxelization size. These subsubspaces will be voxelized in sequence.
-    auto extYzSplits = splitResolutionByMaxDim( make_uint2( voxSplitRes.y
-                                                          , voxSplitRes.z ) 
-                                              , extPartition );
+    SplitData<uint2> extYzSplits = 
+        splitResolutionByMaxDim( make_uint2( voxSplitRes.y
+                                           , voxSplitRes.z ) 
+                               , extPartition );
 
     device.data.extResolution = extPartition;
 
@@ -1384,9 +1401,10 @@ void Voxelizer<Node>::fccWorker(
     Bounds<uint3> allocPartition = device.data.allocResolution;
     uint3 allocRes = allocPartition.max - allocPartition.min;
 
-    auto allocYzSplits = splitResolutionByMaxDim( make_uint2( voxSplitRes.y 
-                                                            , voxSplitRes.z ) 
-                                                , allocPartition );
+    SplitData<uint2> allocYzSplits = 
+        splitResolutionByMaxDim( make_uint2( voxSplitRes.y 
+                                           , voxSplitRes.z ) 
+                               , allocPartition );
 
     uint nrOfNodes = 4 * allocRes.x * allocRes.y * allocRes.z;
 
@@ -1434,19 +1452,19 @@ void Voxelizer<Node>::fccWorker(
                             , 0.0
                             , xSlicing ? 0.0 : halfWidth );
 
-        for ( uint i = 0; i < extYzSplits.first.x * extYzSplits.first.y; ++i )
-            this->performVoxelization( extYzSplits.second[i]
+        for ( uint i = 0; i < extYzSplits.counts.x * extYzSplits.counts.y; ++i )
+            this->performVoxelization( extYzSplits.splits[i]
                                      , xRes
                                      , xSplits
                                      , device );
 
         for ( uint i = 0
-            ; i < allocYzSplits.first.x * allocYzSplits.first.y
+            ; i < allocYzSplits.counts.x * allocYzSplits.counts.y
             ; ++i )
             launchConvertToFCCGrid( device.data
                                   , device.voxels_gpu.get()
                                   , device.nodes_gpu.get()
-                                  , allocYzSplits.second[i]
+                                  , allocYzSplits.splits[i]
                                   , xSlicing ? (gridType + 1) % 4 + 1 : 
                                                gridType
                                   , this->startTime
@@ -1473,11 +1491,13 @@ void Voxelizer<Node>::fccWorker(
     allocRes = device.data.allocResolution.max -
         device.data.allocResolution.min;
 
-    for ( uint i = 0; i < allocYzSplits.first.x * allocYzSplits.first.y; ++i )
+    for ( uint i = 0
+        ; i < allocYzSplits.counts.x * allocYzSplits.counts.y
+        ; ++i )
     {
-        allocYzSplits.second[i].min.y *= 2;
+        allocYzSplits.splits[i].min.y *= 2;
         //allocYzSplits.second[i].max.y -= 1;
-        allocYzSplits.second[i].max.y *= 2;
+        allocYzSplits.splits[i].max.y *= 2;
         //allocYzSplits.second[i].max.y += 1;
     }
 
@@ -1488,8 +1508,8 @@ void Voxelizer<Node>::fccWorker(
         // in all three dimensions, instead of just two like in the plain 
         // voxelizer, there are performance pressures to use smaller spaces
         // when voxelizing. The division is done according to matSplitRes.
-        auto splits = this->splitResolutionByMaxDim( matSplitRes
-                                                   , extPartition );
+        SplitData<uint3> splits = 
+            this->splitResolutionByMaxDim( matSplitRes, extPartition );
 
         // Calculate four voxelizations, each shifted a little in relation to 
         // the others. They are also sparser than the final outcome.
@@ -1532,7 +1552,7 @@ void Voxelizer<Node>::fccWorker(
                                       , this->options.verbose );
 
             for ( uint i = 0
-                ; i < splits.first.x * splits.first.y * splits.first.z
+                ; i < splits.counts.x * splits.counts.y * splits.counts.z
                 ; ++i )
             {
                 calcOptSurfaceVoxelization( device.data
@@ -1543,7 +1563,7 @@ void Voxelizer<Node>::fccWorker(
                                           , device.sortedTriangles_gpu.get()
                                           , device.materials_gpu.get()
                                           , device.nodes_gpu.get()
-                                          , splits.second[i]
+                                          , splits.splits[i]
                                           , xSlicing ? (gridType + 1) % 4 + 1
                                                      : gridType
                                           , this->startTime
@@ -1581,12 +1601,12 @@ void Voxelizer<Node>::fccWorker(
         // The two arrays are identical in size, but the node arrangement is 
         // different.
         for ( uint i = 0
-            ; i < allocYzSplits.first.x * allocYzSplits.first.y
+            ; i < allocYzSplits.counts.x * allocYzSplits.counts.y
             ; ++i )
             restoreRotatedNodes( device.data
                                , device.nodes_gpu.get()
                                , device.nodesCopy_gpu.get()
-                               , allocYzSplits.second[i]
+                               , allocYzSplits.splits[i]
                                , this->startTime
                                , this->options.verbose );
 
@@ -1615,12 +1635,14 @@ void Voxelizer<Node>::fccWorker(
     }
 
     // Calculate orientations.
-    for ( uint i = 0; i < allocYzSplits.first.x * allocYzSplits.first.y; ++i )
+    for ( uint i = 0
+        ; i < allocYzSplits.counts.x * allocYzSplits.counts.y
+        ; ++i )
     {
         launchCalculateFCCBoundaries( device.data
                                     , device.nodes_gpu.get()
                                     , device.nodesCopy_gpu.get()
-                                    , allocYzSplits.second[i]
+                                    , allocYzSplits.splits[i]
                                     , this->options.slices && 
                                       this->options.sliceDirection == 0
                                     , this->startTime 
@@ -1702,13 +1724,13 @@ void Voxelizer<Node>::fccWorker(
 ///         struct.
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node> 
-auto Voxelizer<Node>::voxelizeToNodes( uint  maxDimension,
-                                       uint2 devConfig,
-                                       uint3 voxSplitRes,
-                                       uint3 matSplitRes )
-    -> std::vector<NodePointer<Node>>
+std::vector<NodePointer<Node> > Voxelizer<Node>::voxelizeToNodes( 
+    uint  maxDimension,
+    uint2 devConfig,
+    uint3 voxSplitRes,
+    uint3 matSplitRes )
 {
-    std::vector<NodePointer<Node>> result;
+    std::vector<NodePointer<Node> > result;
 
     this->options.nodeOutput = true;
 
@@ -1761,13 +1783,13 @@ auto Voxelizer<Node>::voxelizeToNodes( uint  maxDimension,
 ///         struct.
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node> 
-auto Voxelizer<Node>::voxelizeToNodes( double cubeLength,
-                                       uint2 devConfig,
-                                       uint3 voxSplitRes,
-                                       uint3 matSplitRes )
-    -> std::vector<NodePointer<Node>>
+std::vector<NodePointer<Node> > Voxelizer<Node>::voxelizeToNodes( 
+    double cubeLength,
+    uint2 devConfig,
+    uint3 voxSplitRes,
+    uint3 matSplitRes )
 {
-    std::vector<NodePointer<Node>> result;
+    std::vector<NodePointer<Node> > result;
 
     this->options.nodeOutput = true;
     this->options.voxelDistanceGiven = true;
@@ -1793,12 +1815,12 @@ auto Voxelizer<Node>::voxelizeToNodes( double cubeLength,
 /// \return A \p NodePointer struct.
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node> 
-auto Voxelizer<Node>::voxelizeToNodesToRAM( 
+NodePointer<Node> Voxelizer<Node>::voxelizeToNodesToRAM( 
     uint  maxDimension,
     uint3 voxSplitRes,
-    uint3 matSplitRes ) -> NodePointer<Node> 
+    uint3 matSplitRes )
 {
-    auto result = NodePointer<Node>();
+    NodePointer<Node> result = NodePointer<Node>();
 
     if ( Node::isFCCNode() )
     {
@@ -1812,7 +1834,7 @@ auto Voxelizer<Node>::voxelizeToNodesToRAM(
 
     this->voxelizeEntry( make_uint2( 1 ), voxSplitRes, matSplitRes, NULL );
 
-    result = this->collectData( *this->devices[0], true );
+    result = this->collectData( this->devices[0], true );
 
     return result;
 }
@@ -1830,12 +1852,12 @@ auto Voxelizer<Node>::voxelizeToNodesToRAM(
 /// \return A \p NodePointer struct.
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node> 
-auto Voxelizer<Node>::voxelizeToNodesToRAM( 
+NodePointer<Node> Voxelizer<Node>::voxelizeToNodesToRAM( 
     double cubeLength,
     uint3 voxSplitRes,
-    uint3 matSplitRes ) -> NodePointer<Node>
+    uint3 matSplitRes )
 {
-    auto result = NodePointer<Node>();
+    NodePointer<Node> result = NodePointer<Node>();
 
     this->options.nodeOutput = true;
     this->options.voxelDistanceGiven = true;
@@ -1843,7 +1865,7 @@ auto Voxelizer<Node>::voxelizeToNodesToRAM(
 
     this->voxelizeEntry( make_uint2( 1 ), voxSplitRes, matSplitRes, NULL );
 
-    result = this->collectData( *this->devices[0], true );
+    result = this->collectData( this->devices[0], true );
 
     return result;
 }
@@ -1888,15 +1910,16 @@ auto Voxelizer<Node>::voxelizeToNodesToRAM(
 ///         middle slice is the actual result.
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node> 
-auto Voxelizer<Node>::voxelizeSlice( uint  maxDimension
-                                        , int   direction 
-                                        , uint  slice
-                                        , uint  devConfig
-                                        , uint2 voxSplitRes
-                                        , uint2 matSplitRes )
-    -> std::vector<NodePointer<Node>> 
+std::vector<NodePointer<Node> >  Voxelizer<Node>::voxelizeSlice
+    ( uint  maxDimension
+    , int   direction 
+    , uint  slice
+    , uint  devConfig
+    , uint2 voxSplitRes
+    , uint2 matSplitRes 
+    )
 {
-    std::vector<NodePointer<Node>> result;
+    std::vector<NodePointer<Node> > result;
 
     if ( Node::isFCCNode() )
     {
@@ -1993,15 +2016,16 @@ auto Voxelizer<Node>::voxelizeSlice( uint  maxDimension
 ///         middle slice is the actual result.
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node> 
-auto Voxelizer<Node>::voxelizeSlice( double cubeLength
-                                        , int   direction 
-                                        , uint  slice
-                                        , uint  devConfig
-                                        , uint2 voxSplitRes
-                                        , uint2 matSplitRes )
-    -> std::vector<NodePointer<Node>> 
+std::vector<NodePointer<Node> >  Voxelizer<Node>::voxelizeSlice
+    ( double cubeLength
+    , int   direction 
+    , uint  slice
+    , uint  devConfig
+    , uint2 voxSplitRes
+    , uint2 matSplitRes 
+    )
 {
-    std::vector<NodePointer<Node>> result;
+    std::vector<NodePointer<Node> > result;
 
     this->options.nodeOutput = true;
     this->options.slices = true;
@@ -2089,14 +2113,13 @@ auto Voxelizer<Node>::voxelizeSlice( double cubeLength
 ///         middle slice is the actual result.
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node>
-auto Voxelizer<Node>::voxelizeSliceToRAM( uint  maxDimension
-                                        , int   direction
-                                        , uint  slice
-                                        , uint2 voxSplitRes
-                                        , uint2 matSplitRes )
-    -> NodePointer<Node> 
+NodePointer<Node>  Voxelizer<Node>::voxelizeSliceToRAM( uint  maxDimension
+                                                      , int   direction
+                                                      , uint  slice
+                                                      , uint2 voxSplitRes
+                                                      , uint2 matSplitRes )
 {
-    auto result = NodePointer<Node>();
+    NodePointer<Node> result = NodePointer<Node>();
 
     if ( Node::isFCCNode() )
     {
@@ -2134,7 +2157,7 @@ auto Voxelizer<Node>::voxelizeSliceToRAM( uint  maxDimension
 
     this->voxelizeEntry( dc, vsr, msr, NULL );
 
-    result = this->collectData( *this->devices[0], true );
+    result = this->collectData( this->devices[0], true );
 
     this->options.slicePrepared = true;
 
@@ -2177,14 +2200,13 @@ auto Voxelizer<Node>::voxelizeSliceToRAM( uint  maxDimension
 ///         middle slice is the actual result.
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node>
-auto Voxelizer<Node>::voxelizeSliceToRAM( double cubeLength
-                                             , int   direction
-                                             , uint  slice
-                                             , uint2 voxSplitRes
-                                             , uint2 matSplitRes )
-    -> NodePointer<Node> 
+NodePointer<Node> Voxelizer<Node>::voxelizeSliceToRAM( double cubeLength
+                                                     , int   direction
+                                                     , uint  slice
+                                                     , uint2 voxSplitRes
+                                                     , uint2 matSplitRes )
 {
-    auto result = NodePointer<Node>();
+    NodePointer<Node> result = NodePointer<Node>();
 
     this->options.nodeOutput = true;
     this->options.slices = true;
@@ -2217,7 +2239,7 @@ auto Voxelizer<Node>::voxelizeSliceToRAM( double cubeLength
 
     this->voxelizeEntry( dc, vsr, msr, NULL );
 
-    result = this->collectData( *this->devices[0], true );
+    result = this->collectData( this->devices[0], true );
 
     this->options.slicePrepared = true;
 
@@ -2235,11 +2257,10 @@ auto Voxelizer<Node>::voxelizeSliceToRAM( double cubeLength
 ///         voxel.
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node> 
-auto Voxelizer<Node>::voxelizeToRAM( uint  maxDimension,
-                                          uint3 voxSplitRes )
-    -> NodePointer<Node>
+NodePointer<Node> Voxelizer<Node>::voxelizeToRAM( uint  maxDimension,
+                                                  uint3 voxSplitRes )
 {
-    auto result = NodePointer<Node>();
+    NodePointer<Node> result = NodePointer<Node>();
 
     if ( Node::isFCCNode() )
     {
@@ -2255,7 +2276,7 @@ auto Voxelizer<Node>::voxelizeToRAM( uint  maxDimension,
         , make_uint3( 0 )
         , NULL );
 
-    result = this->collectData( *this->devices[0], true );
+    result = this->collectData( this->devices[0], true );
 
     return result;
 }
@@ -2271,9 +2292,8 @@ auto Voxelizer<Node>::voxelizeToRAM( uint  maxDimension,
 ///         voxel.
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node> 
-auto Voxelizer<Node>::voxelizeToRAM( double cubeLength,
-                                          uint3 voxSplitRes )
-    -> NodePointer<Node>
+NodePointer<Node> Voxelizer<Node>::voxelizeToRAM( double cubeLength,
+                                                  uint3 voxSplitRes )
 {
     NodePointer<Node> result = NodePointer<Node>();
 
@@ -2292,7 +2312,7 @@ auto Voxelizer<Node>::voxelizeToRAM( double cubeLength,
         , make_uint3( 0 )
         , NULL );
 
-    result = this->collectData( *this->devices[0], true );
+    result = this->collectData( this->devices[0], true );
 
     return result;
 }
@@ -2603,8 +2623,7 @@ void Voxelizer<Node>::adjustResolution( uint xSplits )
 /// \param[in] device Which device's variables are being accessed.
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node> 
-void Voxelizer<Node>::prepareForConstructWorkQueue( 
-    DevContext<Node> & device )
+void Voxelizer<Node>::prepareForConstructWorkQueue( DevContext<Node> & device )
 {
     if (this->options.verbose) 
         std::cout << (clock() - this->startTime) << 
@@ -2902,11 +2921,11 @@ inline int Voxelizer<Node>::convertSMVer2Cores(
 /// \return A pair that contains both the number of splits along each dimension 
 ///         as well as a unique_ptr to an array of \p Bounds objects.
 ///////////////////////////////////////////////////////////////////////////////
-template <class Node>
-auto Voxelizer<Node>::splitResolutionByMaxDim
-    ( uint3		  const & maxDimensions
+template <class Node> 
+SplitData<uint3> Voxelizer<Node>::splitResolutionByMaxDim
+    ( uint3		    const & maxDimensions
     , Bounds<uint3> const & resolution 
-    ) -> std::pair<uint3, std::unique_ptr<Bounds<uint3>[]>>
+    )
 {
     // Calculate the required number of partitions and forward calculations to
     // splitResolutionByNrOfParts.
@@ -2916,12 +2935,12 @@ auto Voxelizer<Node>::splitResolutionByMaxDim
         ( res.y + maxDimensions.y - 1 ) / maxDimensions.y,
         ( res.z + maxDimensions.z - 1 ) / maxDimensions.z );
 
-    std::pair<uint3, std::unique_ptr<Bounds<uint3>[]>> result(
+    SplitData<uint3> result = { 
         nrOfPartitions,
-        this->splitResolutionByNrOfParts( nrOfPartitions, resolution )
-    );
+        this->splitResolutionByNrOfParts( nrOfPartitions, resolution ) 
+    };
 
-    return std::move( result );
+    return result;
 }
 ///////////////////////////////////////////////////////////////////////////////
 /// Splits a given space (in voxel coordinates) into a number of \a subspaces by 
@@ -2936,11 +2955,11 @@ auto Voxelizer<Node>::splitResolutionByMaxDim
 /// \return A pair that contains both the number of splits along each dimension 
 ///         as well as a unique_ptr to an array of \p Bounds objects.
 ///////////////////////////////////////////////////////////////////////////////
-template <class Node>
-auto Voxelizer<Node>::splitResolutionByMaxDim
-    ( uint2		  const & maxDimensions
+template <class Node> 
+SplitData<uint2> Voxelizer<Node>::splitResolutionByMaxDim
+    ( uint2		    const & maxDimensions
     , Bounds<uint3> const & resolution 
-    ) -> std::pair<uint2, std::unique_ptr<Bounds<uint2>[]>>
+    )
 {
     // Calculate the required number of partitions and forward calculations to
     // splitResolutionByNrOfParts.
@@ -2951,12 +2970,12 @@ auto Voxelizer<Node>::splitResolutionByMaxDim
         ( res.x + maxDimensions.x - 1 ) / maxDimensions.x,
         ( res.y + maxDimensions.y - 1 ) / maxDimensions.y );
 
-    std::pair<uint2, std::unique_ptr<Bounds<uint2>[]>> result(
+    SplitData<uint2> result = { 
         nrOfPartitions,
-        this->splitResolutionByNrOfParts( nrOfPartitions, resolution )
-    );
+        this->splitResolutionByNrOfParts( nrOfPartitions, resolution ) 
+    };
 
-    return std::move( result );
+    return result;
 }
 ///////////////////////////////////////////////////////////////////////////////
 /// Splits a given space (in voxel coordinates) into a number of \a subspaces by 
@@ -2971,11 +2990,11 @@ auto Voxelizer<Node>::splitResolutionByMaxDim
 /// \return A pair that contains both the number of splits along the x-axis 
 ///         as well as a unique_ptr to an array of \p Bounds objects.
 ///////////////////////////////////////////////////////////////////////////////
-template <class Node>
-auto Voxelizer<Node>::splitResolutionByMaxDim
+template <class Node> 
+SplitData<uint> Voxelizer<Node>::splitResolutionByMaxDim
     ( uint				  maxDimension
     , Bounds<uint3> const & resolution 
-    ) -> std::pair<uint, std::unique_ptr<Bounds<uint>[]>>
+    )
 {
     // Calculate the required number of partitions and forward calculations to
     // splitResolutionByNrOfParts.
@@ -2983,12 +3002,12 @@ auto Voxelizer<Node>::splitResolutionByMaxDim
 
     uint const nrOfPartitions = ( res + maxDimension - 1 ) / maxDimension;
 
-    std::pair<uint, std::unique_ptr<Bounds<uint>[]>> result(
+    SplitData<uint> result = { 
         nrOfPartitions,
-        this->splitResolutionByNrOfParts( nrOfPartitions, resolution )
-    );
+        this->splitResolutionByNrOfParts( nrOfPartitions, resolution ) 
+    };
 
-    return std::move( result );
+    return result;
 }
 ///////////////////////////////////////////////////////////////////////////////
 /// Splits a given space (in voxel coordinates) into a number of \a subspaces
@@ -3005,16 +3024,18 @@ auto Voxelizer<Node>::splitResolutionByMaxDim
 /// \return A unique_ptr that contains an array of \p Bounds objects.
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node>
-auto Voxelizer<Node>::splitResolutionByNrOfParts
-    ( uint3		  const & nrOfPartitions
+boost::shared_array<Bounds<uint3> > 
+Voxelizer<Node>::splitResolutionByNrOfParts
+    ( uint3		    const & nrOfPartitions
     , Bounds<uint3> const & resolution 
-    ) -> std::unique_ptr<Bounds<uint3>[]>
+    )
 {
     // Number of subspaces.
     uint const resultSize = 
         nrOfPartitions.x * nrOfPartitions.y * nrOfPartitions.z;
 
-    std::unique_ptr<Bounds<uint3>[]> result( new Bounds<uint3>[ resultSize ] );
+    boost::shared_array<Bounds<uint3> > result( 
+        new Bounds<uint3>[resultSize] );
 
     // The algorithm essentially divides a length into multiple sublengths by
     // dividing the initial length with the number of splits and rounding down.
@@ -3028,13 +3049,13 @@ auto Voxelizer<Node>::splitResolutionByNrOfParts
 
     Bounds<uint> xBound, yBound, zBound;
 
-    std::unique_ptr<Bounds<uint>[]> xBounds( 
+    boost::scoped_array<Bounds<uint> > xBounds( 
         new Bounds<uint>[nrOfPartitions.x] );
 
-    std::unique_ptr<Bounds<uint>[]> yBounds(
+    boost::scoped_array<Bounds<uint> > yBounds(
         new Bounds<uint>[nrOfPartitions.y] );
 
-    std::unique_ptr<Bounds<uint>[]> zBounds(
+    boost::scoped_array<Bounds<uint> > zBounds(
         new Bounds<uint>[nrOfPartitions.z] );
 
     uint const maxNrOfPartitions = 
@@ -3083,7 +3104,7 @@ auto Voxelizer<Node>::splitResolutionByNrOfParts
         }
     }
 
-    return std::move( result );
+    return result;
 }
 ///////////////////////////////////////////////////////////////////////////////
 /// Splits a given space (in voxel coordinates) into a number of \a subspaces
@@ -3099,14 +3120,15 @@ auto Voxelizer<Node>::splitResolutionByNrOfParts
 /// \return A unique_ptr that contains an array of \p Bounds objects.
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node>
-auto Voxelizer<Node>::splitResolutionByNrOfParts
-    ( uint2		  const & nrOfPartitions
-    , Bounds<uint3> const & resolution )
-    -> std::unique_ptr<Bounds<uint2>[]>
+boost::shared_array<Bounds<uint2> >  Voxelizer<Node>::splitResolutionByNrOfParts
+    ( uint2		    const & nrOfPartitions
+    , Bounds<uint3> const & resolution
+    )
 {
     uint const resultSize = nrOfPartitions.x * nrOfPartitions.y;
 
-    std::unique_ptr<Bounds<uint2>[]> result( new Bounds<uint2>[ resultSize ] );
+    boost::shared_array<Bounds<uint2> > result( 
+        new Bounds<uint2>[resultSize] );
 
     // More or less identical to the three-dimensional version.
 
@@ -3116,9 +3138,9 @@ auto Voxelizer<Node>::splitResolutionByNrOfParts
 
     Bounds<uint> yBound, zBound;
 
-    std::unique_ptr<Bounds<uint>[]> yBounds(
+    boost::scoped_array<Bounds<uint> > yBounds(
         new Bounds<uint>[nrOfPartitions.x] );
-    std::unique_ptr<Bounds<uint>[]> zBounds(
+    boost::scoped_array<Bounds<uint> > zBounds(
         new Bounds<uint>[nrOfPartitions.y] );
 
     uint const maxNrOfPartitions = max( nrOfPartitions.x, nrOfPartitions.y );
@@ -3154,7 +3176,7 @@ auto Voxelizer<Node>::splitResolutionByNrOfParts
         }
     }
 
-    return std::move( result );
+    return result;
 }
 ///////////////////////////////////////////////////////////////////////////////
 /// Splits a given space (in voxel coordinates) into a number of \a subspaces
@@ -3170,12 +3192,13 @@ auto Voxelizer<Node>::splitResolutionByNrOfParts
 /// \return A unique_ptr that contains an array of \p Bounds objects.
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node>
-auto Voxelizer<Node>::splitResolutionByNrOfParts
+boost::shared_array<Bounds<uint> > Voxelizer<Node>::splitResolutionByNrOfParts
     ( uint				  nrOfPartitions 
     , Bounds<uint3> const & resolution
-    ) -> std::unique_ptr<Bounds<uint>[]>
+    )
 {
-    std::unique_ptr<Bounds<uint>[]> result( new Bounds<uint>[ nrOfPartitions ] );
+    boost::shared_array<Bounds<uint> > result( 
+        new Bounds<uint>[nrOfPartitions] );
 
     // Identical to the two- and three-dimensional versions, except that it is
     // much simpler due to there only being one dimension to worry about.
@@ -3194,7 +3217,7 @@ auto Voxelizer<Node>::splitResolutionByNrOfParts
         result[i - 1].max = resolution.min.x + xBound.max;
     }
 
-    return std::move( result );
+    return result;
 }
 ///////////////////////////////////////////////////////////////////////////////
 /// Enables or disables verbose output during the execution of the voxelizer.
@@ -3298,9 +3321,11 @@ uint3 Voxelizer<Node>::getArrayDimensions( uint longestSizeInVoxels
         this->calculateBoundingBox();
         this->determineDimensions();
 
-        auto xSplits = splitResolutionByMaxDim( maxInternalXSize
-                                              , this->hostVars.resolution );
-        this->adjustResolution( xSplits.first );
+        SplitData<uint> xSplits = 
+            splitResolutionByMaxDim( maxInternalXSize
+                                   , this->hostVars.resolution );
+
+        this->adjustResolution( xSplits.counts );
 
         this->hostVars.resolution.max.y += 2;
         this->hostVars.resolution.max.z += 2;
@@ -3335,10 +3360,11 @@ uint3 Voxelizer<Node>::getArrayDimensions( uint longestSizeInVoxels
     this->setResolution( longestSizeInVoxels );
     this->determineDimensions();
 
-    auto xSplits = splitResolutionByMaxDim( maxInternalXSize
-                                          , this->hostVars.resolution );
+    SplitData<uint> xSplits = 
+        splitResolutionByMaxDim( maxInternalXSize
+                               , this->hostVars.resolution );
 
-    this->adjustResolution( xSplits.first );
+    this->adjustResolution( xSplits.counts );
     
     result = this->hostVars.resolution.max - this->hostVars.resolution.min;
     result.y += 2;
@@ -3384,9 +3410,10 @@ uint3 Voxelizer<Node>::getArrayDimensions( double cubeLength
         this->calculateBoundingBox();
         this->determineDimensions( cubeLength );
 
-        auto xSplits = splitResolutionByMaxDim( maxInternalXSize
-                                              , this->hostVars.resolution );
-        this->adjustResolution( xSplits.first );
+        SplitData<uint> xSplits = 
+            splitResolutionByMaxDim( maxInternalXSize
+                                   , this->hostVars.resolution );
+        this->adjustResolution( xSplits.counts );
 
         this->hostVars.resolution.max.y += 2;
         this->hostVars.resolution.max.z += 2;
@@ -3440,10 +3467,11 @@ uint3 Voxelizer<Node>::getArrayDimensions( double cubeLength
 
     this->determineDimensions( cubeLength );
 
-    auto xSplits = splitResolutionByMaxDim( maxInternalXSize
-                                          , this->hostVars.resolution );
+    SplitData<uint> xSplits = 
+        splitResolutionByMaxDim( maxInternalXSize
+                               , this->hostVars.resolution );
 
-    this->adjustResolution( xSplits.first );
+    this->adjustResolution( xSplits.counts );
     
     result = this->hostVars.resolution.max - this->hostVars.resolution.min;
     result.y += 2;
@@ -3484,16 +3512,18 @@ void Voxelizer<Node>::resetDataStructures( DevContext<Node> & device )
 /// \return vector of \p NodePointer that contains data from all devices.
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node>
-auto Voxelizer<Node>::collectData() -> std::vector<NodePointer<Node>>
+std::vector<NodePointer<Node> > Voxelizer<Node>::collectData()
 {
-    std::vector<NodePointer<Node>> result;
+    std::vector<NodePointer<Node> > result;
 
     const bool uploadToHost = this->options.simulateMultidevice;
 
-    for ( auto it = this->devices.begin(); it != this->devices.end(); ++it )
-        result.push_back( this->collectData( **it, uploadToHost ) );
+    for ( int i = 0; i < this->nrOfDevicesInUse; ++i )
+        result.push_back( this->collectData( this->devices[i]
+                                           , uploadToHost
+                                           ) );
 
-    return std::move( result );
+    return result;
 }
 ///////////////////////////////////////////////////////////////////////////////
 /// Takes into account the unique characteristics of every different output 
@@ -3510,15 +3540,16 @@ auto Voxelizer<Node>::collectData() -> std::vector<NodePointer<Node>>
 /// \return \p NodePointer that contains the data of a particular device.
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node>
-auto Voxelizer<Node>::collectData
+NodePointer<Node> Voxelizer<Node>::collectData
     ( DevContext<Node> & device
-    , const bool hostPointers
-    ) -> NodePointer<Node>
+    , const bool         hostPointers
+    )
 {
-    auto result = NodePointer<Node>();
+    NodePointer<Node> result = NodePointer<Node>();
 
     // Dimensions of the output grid.
-    const uint3 res = device.data.allocResolution.max - device.data.allocResolution.min;
+    const uint3 res = device.data.allocResolution.max - 
+                      device.data.allocResolution.min;
 
     result.dev = device.data.dev;
     result.dim = res;
@@ -3600,11 +3631,10 @@ auto Voxelizer<Node>::collectData
 ///         host pointers instead of device pointers.
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node>
-auto Voxelizer<Node>::simulateMultidevice
+std::vector<NodePointer<Node> > Voxelizer<Node>::simulateMultidevice
     ( 
-        std::function< std::vector< NodePointer<Node> >() > func
+        boost::function< std::vector< NodePointer<Node> >() > func
     )
-    -> std::vector<NodePointer<Node>>
 {
     this->options.simulateMultidevice = true;
     return func();

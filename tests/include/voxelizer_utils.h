@@ -1,7 +1,9 @@
+#ifdef _WIN32
 #pragma once
+#endif
 
-#if !defined(_VOXELIZER_UTILS_H_)
-#define _VOXELIZER_UTILS_H_
+#ifndef VOXELIZER_UTILS_H
+#define VOXELIZER_UTILS_H
 
 #include "voxelizer.h"
 

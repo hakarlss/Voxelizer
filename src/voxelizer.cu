@@ -84,7 +84,7 @@ void compactWorkQueue(
     thrust::device_ptr<uint> wqtil = 
         thrust::device_pointer_cast<uint>(workQueueTiles_gpu);
     thrust::device_ptr<uint> iv;
-    thrust::pair<thrust::device_ptr<uint>, thrust::device_ptr<uint>> ne;
+    thrust::pair<thrust::device_ptr<uint>, thrust::device_ptr<uint> > ne;
     thrust::device_ptr<uint> tl;
     thrust::device_ptr<uint> to;
 

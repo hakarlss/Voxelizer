@@ -1,4 +1,9 @@
+#ifdef _WIN32
 #pragma once
+#endif
+
+#ifndef GLOBAL_FUNCTIONS_H
+#define GLOBAL_FUNCTIONS_H
 
 #include "clean_defs.h"
 #include <cuda.h>
@@ -300,3 +305,5 @@ void dummyFunction();
 void masterDummyFunction();
 
 } // End namespace vox
+
+#endif

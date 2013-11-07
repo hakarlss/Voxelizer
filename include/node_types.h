@@ -1,4 +1,9 @@
+#ifdef _WIN32
 #pragma once
+#endif
+
+#ifndef NODE_TYPES_H
+#define NODE_TYPES_H
 
 #include "aux_definitions.h"
 
@@ -701,3 +706,5 @@ private:
 };
 
 } // End namespace vox
+
+#endif

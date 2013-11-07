@@ -1,4 +1,9 @@
+#ifdef _WIN32
 #pragma once
+#endif
+
+#ifndef CLEAN_DEFS_H
+#define CLEAN_DEFS_H
 
 #include <stdint.h>
 #include <cuda.h>
@@ -275,3 +280,5 @@ struct CommonHostData
 };
 
 } // End namespace vox
+
+#endif
