@@ -29,16 +29,13 @@
 
 #include <vector>
 #include <iterator>
+#include <memory>
 #include <map>
 
 #include <string>
+#include <functional>
 
 #include <boost/program_options.hpp>
-#include <boost/function.hpp>
-#include <boost/bind.hpp>
-#include <boost/scoped_array.hpp>
-#include <boost/shared_array.hpp>
-#include <boost/lambda/lambda.hpp>
 
 void visualize(vtkPolyData* data, double3 minVertex, double3 maxVertex, double voxelLength, int y, int z, uint3 res, vox::MainAxis direction);
 void renderVoxelization(unsigned int* voxels, bool onlySurface, uint3 res);
@@ -53,7 +50,7 @@ template <class Node>
 void testMaterials(Node const * nodes, float const * vertices, uint const * indices, uint nrOfTriangles, int x, int y, int z, uint3 resolution, float voxelLength);
 template <class Node>
 void testMaterialsLoop(Node const * nodes, float const * vertices, uint const * indices, uint nrOfTriangles, uint3 resolution, float voxelLength);
-std::pair<boost::shared_array<float>, boost::shared_array<uint> > loadModel(vtkSmartPointer<vtkPolyData> & model, uint &nrOfVertices, uint &nrOfTriangles);
+std::pair<std::unique_ptr<float[]>, std::unique_ptr<uint[]> > loadModel(vtkSmartPointer<vtkPolyData> & model, uint &nrOfVertices, uint &nrOfTriangles);
 void testCrossproduct();
 template <class Node>
 uint numberOfNodesWithNoMaterial(Node* nodes, uint3 resolution);
@@ -63,7 +60,7 @@ void analyzeRatioNodes(Node* nodes, uint3 resolution, float voxelLength, int nth
 template <class Node>
 void printOrientationDistribution(Node* nodes, uint3 resolution);
 template <class Node>
-Node * stitchNodeArrays(std::vector<vox::NodePointer<Node> > const &nps, uint2 splits);
+Node* stitchNodeArrays(std::vector<vox::NodePointer<Node> > const &nps, uint2 splits);
 template <class Node>
 std::vector<vox::NodePointer<Node> > createTestNodes(uint2 splits);
 template <class Node>
@@ -80,6 +77,12 @@ void applySlice( Node * slice
 template <class NT>
 void renderFCCNodeOutput(NT* nodes, bool onlySurface, bool materials, uint3 res);
 void testFunction();
+
+template <typename T>
+void validate( std::string var
+             , std::string msg
+             , boost::program_options::variables_map & vm
+             , std::function<bool( T & )> func );
 
 template <class Node>
 void initTests
@@ -116,6 +119,78 @@ void performAllSliceTest
     ( vox::Voxelizer<Node> & voxelizer
     , const boost::program_options::variables_map & vm
     );
+
+class TestClass
+{
+public:
+    TestClass() throw() { 
+        a = "-"; 
+        print( "Default constructor! ( " + a + " )\n" ); 
+    }
+    TestClass( int i ) throw() {
+        a = std::to_string((long long)i);
+        print( std::string( "Constructor with argument " + a + "\n" ) );
+    }
+    TestClass( const TestClass & rhs ) throw() {
+        auto oldA = a;
+        a = rhs.a; 
+        print( "Copy constructor! ( " + oldA + " to " + a + " )\n" ); 
+    }
+    TestClass( TestClass && rhs ) throw() { 
+        auto oldA = a;
+        std::swap( a, rhs.a );
+        print( "Move constructor! ( " + oldA + " to " + a + " )\n" ); 
+    }
+    ~TestClass() { print( "Default destructor! ( " + a + " )\n" );  }
+
+    TestClass & operator=( const TestClass & rhs ) throw() {
+        auto oldA = a;
+        a = rhs.a;
+        print( "Copy assignment! ( " + oldA + " to " + a + " )\n" ); 
+        return *this;
+    }
+    TestClass & operator=( TestClass && rhs ) throw() {
+        auto oldA = a;
+        std::swap( a, rhs.a );
+        print( "Move assignment! ( " + oldA + " to " + a + " )\n" ); 
+        return *this;
+    }
+
+    std::string get() const throw() { return a; }
+
+private:
+    std::string a;
+
+    void print( std::string msg ) throw() { std::cout << msg; }
+};
+
+class Printable
+{
+public:
+    virtual std::string print() = 0;
+};
+
+class Person : public Printable
+{
+public:
+    Person() {}
+    Person( std::string n ) { name = n; }
+
+    std::string print() { return std::string( "Person name: " ) + name + "\n"; }
+private:
+    std::string name;
+};
+
+class Car : public Printable
+{
+public:
+    Car() {}
+    Car( std::string m ) { model = m; }
+
+    std::string print() { return std::string( "Car model: " ) + model + "\n"; }
+private:
+    std::string model;
+};
 
 int main(int argc, char** argv)
 {
@@ -176,7 +251,7 @@ int main(int argc, char** argv)
             options( desc ).positional( p ).run(), vm );
         boost::program_options::notify( vm );
     }
-    catch ( const std::exception & e )
+    catch ( std::exception & e )
     {
         std::cout << e.what() << "\n";
         return 1;
@@ -238,7 +313,7 @@ int main(int argc, char** argv)
 
     if ( vm.count( "slice" ) )
     {
-        std::vector<uint> sliceArgs = vm[ "slice" ].as<std::vector<uint> >();
+        auto sliceArgs = vm[ "slice" ].as<std::vector<uint> >();
 
         if ( sliceArgs.size() != 2 )
         {
@@ -265,8 +340,7 @@ int main(int argc, char** argv)
 
     if ( vm.count( "multiDevice" ) )
     {
-        std::vector<uint> devConf = 
-            vm[ "multiDevice" ].as<std::vector<uint> >();
+        auto devConf = vm[ "multiDevice" ].as<std::vector<uint> >();
 
         if ( devConf.size() != 2 )
         {
@@ -815,11 +889,12 @@ template <class T>
 class SmartArray : public std::unique_ptr<T, decltype(ArrayDestroyer<T>())> {};
 
 
-std::pair<boost::shared_array<float>, boost::shared_array<uint> > loadModel
+auto loadModel
     ( const vtkSmartPointer<vtkPolyData> & model
     , uint & nrOfVertices
     , uint & nrOfTriangles
     ) 
+    -> std::pair<std::unique_ptr<float[]>, std::unique_ptr<uint[]> >
 {
     // Get triangles with indices (polys) and the vertices (points).
     vtkCellArray* polys = model->GetPolys();
@@ -830,8 +905,8 @@ std::pair<boost::shared_array<float>, boost::shared_array<uint> > loadModel
 
     // Allocate vertex and index arrays in main memory.
 
-    boost::shared_array<float> vertices( new float[3 * nrOfVertices] );
-    boost::shared_array<uint> indices( new uint[3 * nrOfTriangles] );
+    std::unique_ptr<float[]> vertices( new float[3 * nrOfVertices] );
+    std::unique_ptr<uint[]> indices( new uint[3 * nrOfTriangles] );
 
     double vert[3];
 
@@ -857,7 +932,7 @@ std::pair<boost::shared_array<float>, boost::shared_array<uint> > loadModel
         currentPoly++;
     }
 
-    return std::make_pair( vertices, indices );
+    return std::make_pair( std::move( vertices ), std::move( indices ) );
 }
 
 void testCrossproduct()
@@ -1130,7 +1205,7 @@ void analyzeRatioNodes(Node* nodes, uint3 resolution, float voxelLength, int nth
 }
 
 template <class Node>
-Node * stitchNodeArrays
+Node* stitchNodeArrays
     ( std::vector<vox::NodePointer<Node> > const &nps
     , uint2 splits
     )
@@ -1146,8 +1221,7 @@ Node * stitchNodeArrays
 
     Node* result = new Node[res.x * res.y * res.z];
 
-    std::vector<vox::NodePointer<Node> >::iterator it;
-    for ( it = nps.begin(); it < nps.end(); ++it ) {
+    for ( auto it = nps.begin(); it < nps.end(); ++it ) {
         uint3 subRes = it->dim;
 
         for ( uint i = 0; i < subRes.x * subRes.y * subRes.z; ++i ) {
@@ -1208,8 +1282,7 @@ uint3 fetchResolution(
 
     uint3 res = { nps[0].dim.x, 0, 0 };
 
-    std::vector<vox::NodePointer<Node> >::iterator it;
-    for ( it = nps.begin(); it != nps.end(); ++it )
+    for ( auto it = nps.begin(); it != nps.end(); ++it )
         res += make_uint3( 0, it->dim.y - 2, it->dim.z - 2 );
 
     res.y /= splits.y; res.y += 2;
@@ -1442,9 +1515,7 @@ void initTests
         nrOfVertices = 0, 
         nrOfUniqueMaterials = 0;
 
-    std::pair< boost::shared_array<float>
-             , boost::shared_array<uint> > modelData = 
-             loadModel( polys, nrOfVertices, nrOfTriangles );
+    auto modelData = loadModel( polys, nrOfVertices, nrOfTriangles );
     
     vox::Voxelizer<Node> voxelizer( modelData.first.get()
                                   , modelData.second.get()
@@ -1459,8 +1530,8 @@ void initTests
 
     if ( vm.count( "materials" ) )
     {
-        boost::scoped_array<vox::uchar> materials( 
-            new vox::uchar[nrOfTriangles] );
+        auto materials = 
+            std::unique_ptr<vox::uchar[]>( new vox::uchar[nrOfTriangles] );
         nrOfUniqueMaterials = 8;
 
         for ( uint i = 0; i < nrOfTriangles; i++ )
@@ -1499,8 +1570,7 @@ void performPlainVoxelTest
     uint3 voxSplitRes = { 1024, 512, 512 };
     if ( vm.count( "voxRes" ) )
     {
-        std::vector<uint> newVoxSplitRes = 
-            vm[ "voxRes" ].as<std::vector<uint> >();
+        auto newVoxSplitRes = vm[ "voxRes" ].as<std::vector<uint> >();
         voxSplitRes.x = newVoxSplitRes.at(0);
         voxSplitRes.y = newVoxSplitRes.at(1);
         voxSplitRes.z = newVoxSplitRes.at(2);
@@ -1508,12 +1578,11 @@ void performPlainVoxelTest
 
     if ( vm.count( "resolution" ) )
     {
-        uint resolution = vm[ "resolution" ].as<uint>();
+        auto resolution = vm[ "resolution" ].as<uint>();
 
         if ( vm.count( "multiDevice" ) )
         {
-            std::vector<uint> dc = 
-                vm[ "multiDevice" ].as<std::vector<uint> >();
+            auto dc = vm[ "multiDevice" ].as<std::vector<uint> >();
             uint2 devConfig = { dc[0], dc[1] };
 
             result = voxelizer.simulateMultidevice(
@@ -1527,7 +1596,7 @@ void performPlainVoxelTest
     }
     else if ( vm.count( "distance" ) )
     {
-        double distance = vm[ "distance" ].as<double>();
+        auto distance = vm[ "distance" ].as<double>();
 
         result.push_back( voxelizer.voxelizeToRAM( distance
                                                  , voxSplitRes ) );
@@ -1537,8 +1606,7 @@ void performPlainVoxelTest
 
     std::cout << "Size of result: " << result.size() << "\n";
 
-    std::vector<vox::NodePointer<Node> >::iterator it;
-    for ( it = result.begin(); it != result.end(); ++it )
+    for ( auto it = result.begin(); it != result.end(); ++it )
     {
         renderVoxelization( it->vptr, renderSurfaceOnly, it->dim );
         delete[] it->vptr;
@@ -1556,21 +1624,19 @@ void performSliceTest
     uint2 voxSplitRes = { 1024, 512 };
     if ( vm.count( "voxRes" ) )
     {
-        std::vector<uint> newVoxSplitRes = 
-            vm[ "voxRes" ].as<std::vector<uint> >();
+        auto newVoxSplitRes = vm[ "voxRes" ].as<std::vector<uint> >();
         voxSplitRes.x = newVoxSplitRes.at(0);
         voxSplitRes.y = newVoxSplitRes.at(1);
     }
     uint2 matSplitRes = { 1024, 512 };
     if ( vm.count( "matRes" ) )
     {
-        std::vector<uint> newMatSplitRes = 
-            vm[ "matRes" ].as<std::vector<uint> >();
+        auto newMatSplitRes = vm[ "matRes" ].as<std::vector<uint> >();
         matSplitRes.x = newMatSplitRes.at(0);
         matSplitRes.y = newMatSplitRes.at(1);
     }
 
-    std::vector<uint> sliceOptions = vm[ "slice" ].as<std::vector<uint> >();
+    auto sliceOptions = vm[ "slice" ].as<std::vector<uint> >();
     int direction = int( sliceOptions.at(0) );
     uint slice = sliceOptions.at(1);
 
@@ -1579,7 +1645,7 @@ void performSliceTest
 
     if ( vm.count( "resolution" ) )
     {
-        uint resolution = vm[ "resolution" ].as<uint>();
+        auto resolution = vm[ "resolution" ].as<uint>();
         result = voxelizer.voxelizeSliceToRAM( resolution
                                              , direction
                                              , slice
@@ -1588,7 +1654,7 @@ void performSliceTest
     }
     else if ( vm.count( "distance" ) )
     {
-        double distance = vm[ "distance" ].as<double>();
+        auto distance = vm[ "distance" ].as<double>();
 
         result = voxelizer.voxelizeSliceToRAM( distance
                                              , direction
@@ -1630,30 +1696,6 @@ void performSliceTest
     delete[] result.ptr;
 }
 
-template <class Node, class T>
-struct VoxelizeToNodes
-{
-    VoxelizeToNodes( vox::Voxelizer<Node> & voxelizer
-                   , T firstArgument
-                   , uint2 devConf
-                   , uint3 voxSplitRes
-                   , uint3 matSplitRes ): v( voxelizer )
-                                        , fA( firstArgument )
-                                        , dC( devConf )
-                                        , vSR( voxSplitRes )
-                                        , mSR( matSplitRes ) {}
-
-    std::vector<vox::NodePointer<Node> > operator()()
-    {
-        return v.voxelizeToNodes( fA, dC, vSR, mSR );
-    }
-
-    vox::Voxelizer<Node> v;
-    T fA;
-    uint2 dC;
-    uint3 vSR, mSR;
-};
-
 template<class Node>
 void performNodeTest
     ( vox::Voxelizer<Node> & voxelizer
@@ -1665,8 +1707,7 @@ void performNodeTest
     uint3 voxSplitRes = { 1024, 512, 512 };
     if ( vm.count( "voxRes" ) )
     {
-        std::vector<uint> newVoxSplitRes = 
-            vm[ "voxRes" ].as<std::vector<uint> >();
+        auto newVoxSplitRes = vm[ "voxRes" ].as<std::vector<uint> >();
         voxSplitRes.x = newVoxSplitRes.at(0);
         voxSplitRes.y = newVoxSplitRes.at(1);
         voxSplitRes.z = newVoxSplitRes.at(2);
@@ -1674,8 +1715,7 @@ void performNodeTest
     uint3 matSplitRes = { 1024, 512, 512 };
     if ( vm.count( "matRes" ) )
     {
-        std::vector<uint> newMatSplitRes = 
-            vm[ "matRes" ].as<std::vector<uint> >();
+        auto newMatSplitRes = vm[ "matRes" ].as<std::vector<uint> >();
         matSplitRes.x = newMatSplitRes.at(0);
         matSplitRes.y = newMatSplitRes.at(1);
         matSplitRes.z = newMatSplitRes.at(2);
@@ -1685,24 +1725,20 @@ void performNodeTest
 
     if ( vm.count( "resolution" ) )
     {
-        uint resolution = vm[ "resolution" ].as<uint>();
+        auto resolution = vm[ "resolution" ].as<uint>();
 
         if ( vm.count( "multiDevice" ) )
         {
-            std::vector<uint> dc = 
-                vm[ "multiDevice" ].as<std::vector<uint> >();
+            auto dc = vm[ "multiDevice" ].as<std::vector<uint> >();
             devConf.x = dc[0];
             devConf.y = dc[1];
 
-            VoxelizeToNodes<Node, uint> vtn( voxelizer
-                                           , resolution
-                                           , devConf
-                                           , voxSplitRes
-                                           , matSplitRes );
-
-            boost::function< std::vector<vox::NodePointer<Node> >()> func;
-            func = boost::ref( vtn );
-            result = voxelizer.simulateMultidevice( func );
+            result = voxelizer.simulateMultidevice( 
+                [&] () { return voxelizer.voxelizeToNodes( resolution
+                                                         , devConf
+                                                         , voxSplitRes
+                                                         , matSplitRes ); 
+                } );
         }
         else
             result.push_back( voxelizer.voxelizeToNodesToRAM( resolution
@@ -1711,21 +1747,20 @@ void performNodeTest
     }
     else if ( vm.count( "distance" ) )
     {
-        double distance = vm[ "distance" ].as<double>();
+        auto distance = vm[ "distance" ].as<double>();
 
         if ( vm.count( "multiDevice" ) )
         {
-            std::vector<uint> dc = 
-                vm[ "multiDevice" ].as<std::vector<uint> >();
+            auto dc = vm[ "multiDevice" ].as<std::vector<uint> >();
             devConf.x = dc[0];
             devConf.y = dc[1];
 
-            VoxelizeToNodes<Node, double> vtn( voxelizer
-                                             , distance
-                                             , devConf
-                                             , voxSplitRes
-                                             , matSplitRes );
-            result = voxelizer.simulateMultidevice( boost::ref( vtn ) );
+            result = voxelizer.simulateMultidevice( 
+                [&] () { return voxelizer.voxelizeToNodes( distance
+                                                         , devConf
+                                                         , voxSplitRes
+                                                         , matSplitRes ); 
+                } );
         }
         else
             result.push_back( voxelizer.voxelizeToNodesToRAM( distance
@@ -1738,7 +1773,7 @@ void performNodeTest
 
     uint3 res = vm.count( "multiDevice" ) ? fetchResolution( result, devConf )
                                           : result[0].dim;
-    boost::scoped_array<Node> nodes( 
+    auto nodes = std::unique_ptr<Node>( 
         vm.count( "multiDevice" ) ? stitchNodeArrays( result, devConf ) 
                                   : result[0].ptr );
 
@@ -1770,28 +1805,26 @@ void performAllSliceTest
     uint2 voxSplitRes = { 1024, 512 };
     if ( vm.count( "voxRes" ) )
     {
-        std::vector<uint> newVoxSplitRes = 
-            vm[ "voxRes" ].as<std::vector<uint> >();
+        auto newVoxSplitRes = vm[ "voxRes" ].as<std::vector<uint> >();
         voxSplitRes.x = newVoxSplitRes.at(0);
         voxSplitRes.y = newVoxSplitRes.at(1);
     }
     uint2 matSplitRes = { 1024, 512 };
     if ( vm.count( "matRes" ) )
     {
-        std::vector<uint> newMatSplitRes = 
-            vm[ "matRes" ].as<std::vector<uint> >();
+        auto newMatSplitRes = vm[ "matRes" ].as<std::vector<uint> >();
         matSplitRes.x = newMatSplitRes.at(0);
         matSplitRes.y = newMatSplitRes.at(1);
     }
 
     vox::NodePointer<Node> result;
-    const int direction = vm[ "allSlice" ].as<int>();
+    const auto direction = vm[ "allSlice" ].as<int>();
     Node * nodes = nullptr;
     uint3 res;
 
     if ( vm.count( "resolution" ) )
     {
-        const uint resolution = vm[ "resolution" ].as<uint>();
+        const auto resolution = vm[ "resolution" ].as<uint>();
         res = voxelizer.getArrayDimensions( resolution
                                           , voxSplitRes.x
                                           , direction == 0 );
@@ -1821,7 +1854,7 @@ void performAllSliceTest
 
     if ( vm.count( "distance" ) )
     {
-        const double distance = vm[ "distance" ].as<double>();
+        const auto distance = vm[ "distance" ].as<double>();
         res = voxelizer.getArrayDimensions( distance
                                           , voxSplitRes.x
                                           , direction == 0 );
@@ -1905,4 +1938,22 @@ inline std::string printUint3( uint3 & vec )
     result += "( " + x + ", " + y + ", " + z + " )\n";
     
     return std::move( result );
+}
+
+template <typename T>
+void validate( std::string var
+             , std::string msg
+             , boost::program_options::variables_map & vm
+             , std::function<bool( T & )> func )
+{
+    if ( vm.count( var ) )
+    {
+        T val = vm[ var ].as<T>();
+
+        if ( !func(val) )
+        {
+            std::cout << "--" << var << " : " << msg << "\n";
+            std::exit( 1 );
+        }
+    }
 }

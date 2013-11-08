@@ -811,12 +811,12 @@ void Voxelizer<Node>::voxelizeEntry(
     //void (Voxelizer<Node>::*workerFunc)( uint, uint, uint3, uint3
     //                                   , DevContext<Node> & );
 
-    boost::function<void ( Voxelizer<Node> * const voxelizer
+    boost::function<void ( Voxelizer<Node> * voxelizer
                          , uint xRes
                          , uint xSplits
                          , uint3 voxSplitRes
                          , uint3 matSplitRes
-                         , DevContext<Node>& device )> workerFunc;
+                         , DevContext<Node> & device )> workerFunc;
 
 
     if ( Node::isFCCNode() )
@@ -846,7 +846,7 @@ void Voxelizer<Node>::voxelizeEntry(
     {
         // If there are more than one device, launch new threads to process the 
         // additional devices.
-        for ( int i = 0; i < this->nrOfDevicesInUse; ++i )
+        for ( int i = 1; i < this->nrOfDevicesInUse; ++i )
         {
             threads.create_thread( boost::bind( workerFunc 
                                               , this
