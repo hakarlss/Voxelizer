@@ -1002,7 +1002,4 @@ private:
 
 } // End namespace vox
 
-#include "global_functions.h"
-#include "dev_functions.h"
-
 #endif

@@ -12,10 +12,18 @@ file( GLOB SOURCE_FILES . src/*.cpp src/*.cu )
 file( GLOB HEADER_FILES . include/*.h )
 
 # Limits the configuration types available. Doesn't seem to work, though...
-set( CMAKE_CONFIGURATION_TYPES "Debug" "Release" )
+set( CMAKE_CONFIGURATION_TYPES "Debug;Release" )
+
+option( CMAKE_BUILD_SHARED_LIBS	"Choose to build either shared or static libraries." OFF )
+option( CMAKE_BUILD_TYPE "Build type (Debug/Release) for single-configuration build systems." "Release" )
 
 # Boost options.
-set( Boost_USE_STATIC_LIBS ON )
+if ( CMAKE_BUILD_SHARED_LIBS )
+	set( Boost_USE_STATIC_LIBS OFF )
+else ()
+	set( Boost_USE_STATIC_LIBS ON )
+endif ()
+
 set( Boost_USE_MULTITHREADED ON )
 set( Boost_USE_STATIC_RUNTIME OFF )
 set( Boost_NO_BOOST_CMAKE ON )
