@@ -4865,16 +4865,23 @@ template <class Node> void dummyFunction()
     CommonHostData hd;
     Bounds<uint2> ui2b;
     Bounds<uint3> ui3b;
+    Node * n = NULL;
+    VoxInt * v = NULL;
+    clock_t t = 0;
+    bool * b = NULL;
+    float * f = NULL;
+    uint * u = NULL;
+    uchar * c = NULL;
 
-    calcNodeList<Node>( dd, 0, 0, ui2b, 0, true );
-    launchConvertToFCCGrid<Node>( dd, 0, 0, ui2b, 0, 0, true );
-    procNodeList<Node>( dd, 0, 0, 0, ui2b, true, 0, true );
-    launchCalculateFCCBoundaries<Node>( dd, 0, 0, ui2b, true, 0, true );
-    calcSurfaceVoxelization<Node>( dd, hd, 0, 0, 0, 0, 0, true );
-    calcOptSurfaceVoxelization<Node>( dd, hd, 0, 0, 0, 0, 0, 0, ui3b, 0
-                                    , 0, true );
-    makePaddingZero<Node>( dd, 0, 0, true, 0, true );
-    restoreRotatedNodes<Node>( dd, 0, 0, ui2b, 0, true );
+    calcNodeList<Node>( dd, v, n, ui2b, t, true );
+    launchConvertToFCCGrid<Node>( dd, v, n, ui2b, int(0), t, true );
+    procNodeList<Node>( dd, n, n, b, ui2b, true, t, true );
+    launchCalculateFCCBoundaries<Node>( dd, n, n, ui2b, true, t, true );
+    calcSurfaceVoxelization<Node>( dd, hd, f, u, n, c, t, true );
+    calcOptSurfaceVoxelization<Node>( dd, hd, f, u, u, u, c, n, ui3b, int(0)
+                                    , t, true );
+    makePaddingZero<Node>( dd, n, n, true, t, true );
+    restoreRotatedNodes<Node>( dd, n, n, ui2b, t, true );
 }
 ///////////////////////////////////////////////////////////////////////////////
 /// \brief "Uses" functions with every \p Node type to force the compiler to 
@@ -4886,23 +4893,29 @@ template <class Node> void dummyFunction()
 ///////////////////////////////////////////////////////////////////////////////
 void masterDummyFunction()
 {
-    dummyFunction<ShortNode>();
-    dummyFunction<LongNode>();
-    dummyFunction<PartialNode>();
-    dummyFunction<ShortFCCNode>();
-    dummyFunction<LongFCCNode>();
-
     CommonDevData dd;
     CommonHostData hd;
     Bounds<uint2> ui2b;
     Bounds<uint3> ui3b;
+    VoxInt * v = NULL;
+    clock_t t = 0;
+    bool * b = NULL;
+    float * f = NULL;
+    uint * u = NULL;
+    uchar * c = NULL;
 
-    sortWorkQueue( dd, 0, 0, 0, true );
-    compactWorkQueue( dd, 0, 0, 0, 0, true );
-    calcTileOverlap( dd, hd, 0, 0, 0, ui2b, 0, true );
-    calcWorkQueue( dd, hd, 0, 0, 0, 0, 0, ui2b, 0, true );
-    calcVoxelization( dd, hd, 0, 0, 0, 0, 0, 0, 0, ui3b, 0, true );
-    calcTriangleClassification( dd, hd, 0, 0, 0, 0, 0, true );
+    sortWorkQueue( dd, u, u, t, true );
+    compactWorkQueue( dd, u, u, u, t, true );
+    calcTileOverlap( dd, hd, f, u, u, ui2b, t, true );
+    calcWorkQueue( dd, hd, f, u, u, u, u, ui2b, t, true );
+    calcVoxelization( dd, hd, f, u, u, u, u, u, v, ui3b, t, true );
+    calcTriangleClassification( dd, hd, f, u, u, u, t, true );
 }
+
+template void dummyFunction<ShortNode>();
+template void dummyFunction<LongNode>();
+template void dummyFunction<PartialNode>();
+template void dummyFunction<ShortFCCNode>();
+template void dummyFunction<LongFCCNode>();
 
 } // End namespace vox

@@ -526,11 +526,11 @@ void renderVoxelization(unsigned int* voxels, bool onlySurface, uint3 res)
     {
         ints = make_intList(i, voxels, res);
 
-        float p[3] = { 0.0, ints.y, ints.z };
+        float p[3] = { 0.0, float(ints.y), float(ints.z) };
 
         for (unsigned int j = 0; j < 32; j++)
         {
-            if (unsigned int((ints.centre >> (31 - j)) & (unsigned int(1))) == unsigned int(1))
+            if ( ( ( ints.centre >> (31 - j) ) & 1u ) == 1u )
             {
                 if (onlySurface)
                 {

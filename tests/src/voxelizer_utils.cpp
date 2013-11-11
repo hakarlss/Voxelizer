@@ -278,7 +278,8 @@ void testOverlap(vtkPolyData *data, uint y, uint z, bool returnAllResults, uint 
         char hexRep[12];
         for (uint i = 0; i < UTIL_RES / 32; i++)
         {
-            sprintf_s(hexRep, 12*sizeof(char), "%X", voxels[i]);
+            sprintf( hexRep, "%X", voxels[i] );
+            //sprintf_s(hexRep, 12*sizeof(char), "%X", voxels[i]);
             cout << hexRep << " ";
         }
 
@@ -396,7 +397,7 @@ void printVoxels(uint* voxels, uint3 resolution)
     char hexRep[8];
     for (uint i = 0; i < nrOfInts; i++)
     {
-        sprintf_s(hexRep, 8*sizeof(char), "%X", voxels[i]);
+        sprintf( hexRep, "%X", voxels[i] );
         cout << hexRep << " ";
         if ((i+1)%intRes == 0)
             cout << "\n";
@@ -464,11 +465,12 @@ void printVoxelizationIntoFile(char* filename, uint* voxels, uint3 resolution)
     log.open(filename, ios::out | ios::trunc);
     time_t rawtime;
     time(&rawtime);
-    struct tm timeinfo; // = localtime(&rawtime);
-    localtime_s(&timeinfo, &rawtime);
-    char timeAndDate[50];
-    asctime_s(timeAndDate, 50*sizeof(char), &timeinfo);
+    struct tm * timeinfo = localtime(&rawtime);
+    char * timeAndDate = asctime(timeinfo);
     log << "Voxelizer logfile: " << timeAndDate;
+
+    free( timeinfo );
+    free( timeAndDate );
 
     uint intsPerX = resolution.x >> 5;
     uint nrOfInts = resolution.z * resolution.y * intsPerX;
@@ -482,7 +484,7 @@ void printVoxelizationIntoFile(char* filename, uint* voxels, uint3 resolution)
     log << "   0: ";
     for (uint i = 0; i < nrOfInts; i++)
     {
-        sprintf_s(hexRep, 12*sizeof(char), "%8X", voxels[i]);
+        sprintf(hexRep, "%8X", voxels[i]);
         log << hexRep << " ";
 
         if ((i + 1) % (resolution.y * intsPerX) == 0)
@@ -498,7 +500,7 @@ void printVoxelizationIntoFile(char* filename, uint* voxels, uint3 resolution)
             y_next = ((i + 1) % (resolution.y * intsPerX)) / intsPerX;
 
             log << "\n";
-            sprintf_s(yCounter, 10*sizeof(char), "%4u", y_next);
+            sprintf(yCounter, "%4u", y_next);
             log << yCounter << ": ";
         }
     }

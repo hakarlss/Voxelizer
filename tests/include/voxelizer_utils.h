@@ -11,7 +11,9 @@
 #include "vtkCellArray.h"
 #include "vtkPolygon.h"
 
-#include <math.h>
+#include <cmath>
+#include <cstdint>
+#include <cfloat>
 
 #define UTIL_RES 256
 
