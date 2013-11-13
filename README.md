@@ -29,11 +29,11 @@ GENERATE_DOXYGEN_DOCS to have Doxygen generate documentation.
 
 As an example, the process I use to build the Voxelizer is the following:
 
-<Open up the command prompt of the Windows 7.1 SDK>
+[Open up the command prompt of the Windows 7.1 SDK]
 setenv /Release
-cd <build directory>
-cmake -G "Visual Studio 10 Win64" -T "Windows7.1SDK" -D BOOST_ROOT="<path to boost root>" -D GENERATE_TESTS=ON <path to sources>
-<Open up the generated VS project and build the voxelizer>
+cd [build directory]
+cmake -G "Visual Studio 10 Win64" -T "Windows7.1SDK" -D BOOST_ROOT="[path to boost root]" -D GENERATE_TESTS=ON [path to sources]
+[Open up the generated VS project and build the voxelizer]
 
 Linux:
 
