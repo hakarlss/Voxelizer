@@ -24,9 +24,6 @@
 #include <vtkPointData.h>
 #include <vtkVertexGlyphFilter.h>
 
-#include <voxelizer.h>
-#include <voxelizer_utils.h>
-
 #include <vector>
 #include <iterator>
 #include <memory>
@@ -36,6 +33,9 @@
 #include <functional>
 
 #include <boost/program_options.hpp>
+
+#include <voxelizer.h>
+#include <voxelizer_utils.h>
 
 void visualize(vtkPolyData* data, double3 minVertex, double3 maxVertex, double voxelLength, int y, int z, uint3 res, vox::MainAxis direction);
 void renderVoxelization(unsigned int* voxels, bool onlySurface, uint3 res);

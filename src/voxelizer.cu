@@ -1,7 +1,7 @@
-#include "global_functions.h"
-#include "dev_functions.h"
+#include "host_device_interface.h"
+#include "device_code.h"
 #include "helper_math.h"
-#include "clean_defs.h"
+#include "common.h"
 
 #include <cuda_runtime_api.h>
 #include <device_functions.h>

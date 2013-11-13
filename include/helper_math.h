@@ -20,8 +20,8 @@
  *    Thanks to Linh Hah for additions and fixes.
  */
 
-#ifndef HELPER_MATH_H
-#define HELPER_MATH_H
+#ifndef VOX_HELPER_MATH_H
+#define VOX_HELPER_MATH_H
 
 #include <cuda_runtime.h>
 
@@ -1445,5 +1445,562 @@ inline __device__ __host__ float4 smoothstep(float4 a, float4 b, float4 x)
     float4 y = clamp((x - a) / (b - a), 0.0f, 1.0f);
     return (y*y*(make_float4(3.0f) - (make_float4(2.0f)*y)));
 }
+
+#ifndef _DOUBLE2_DOUBLE3_MATH_
+///////////////////////////////////////////////////////////////////////////////
+/// \brief Basic math operators for double2 and double3 structs.
+///
+/// If these functions have been defined elsewhere and they cause conflicts 
+/// when compiling, simply undefine _DOUBLE2_DOUBLE3_MATH_.
+///////////////////////////////////////////////////////////////////////////////
+#define _DOUBLE2_DOUBLE3_MATH_
+#endif
+
+#ifdef _DOUBLE2_DOUBLE3_MATH_
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double2 negation.
+/// 
+/// \param[in] a \p double2.
+/// \returns \f$ -\mathbf{\vec{a}} \f$.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    double2 operator-( double2 &a ) { return make_double2( -a.x, -a.y ); }
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double3 negation.
+/// 
+/// \param[in] a \p double3.
+/// \returns \f$ -\mathbf{\vec{a}} \f$.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    double3 operator-( double3 &a ) 
+{ 
+    return make_double3( -a.x, -a.y, -a.z ); 
+}
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double2 addition. 
+/// 
+/// \param[in] a \p double2.
+/// \param[in] b \p double2.
+/// \returns \f$ \mathbf{\vec{a}} + \mathbf{\vec{b}} \f$.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    double2 operator+( double2 a, double2 b ) 
+{ 
+    return make_double2( a.x + b.x, a.y + b.y ); 
+}
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double3 addition.
+/// 
+/// \param[in] a \p double3.
+/// \param[in] b \p double3.
+/// \returns \f$ \mathbf{\vec{a}} + \mathbf{\vec{b}} \f$.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    double3 operator+( double3 a, double3 b ) 
+{ 
+    return make_double3( a.x + b.x, a.y + b.y, a.z + b.z ); 
+}
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double2 addition with scalar \p double.
+/// 
+/// \param[in] a \p double2.
+/// \param[in] b \p double.
+/// \returns \f$ \mathbf{\vec{a}} + b \f$.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    double2 operator+( double2 a, double b ) 
+{ 
+    return make_double2( a.x + b, a.y + b ); 
+}
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double3 addition with scalar \p double.
+/// 
+/// \param[in] a \p double3.
+/// \param[in] b \p double.
+/// \returns \f$ \mathbf{\vec{a}} + b \f$.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    double3 operator+( double3 a, double b ) 
+{ 
+    return make_double3( a.x + b, a.y + b, a.z + b ); 
+}
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double2 addition with scalar \p double.
+/// 
+/// \param[in] b \p double.
+/// \param[in] a \p double2.
+/// \returns \f$ b + \mathbf{\vec{a}} \f$.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    double2 operator+( double b, double2 a ) 
+{ 
+    return make_double2( a.x + b, a.y + b ); 
+}
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double3 addition with scalar \p double.
+/// 
+/// \param[in] b \p double.
+/// \param[in] a \p double3.
+/// \returns \f$ b + \mathbf{\vec{a}} \f$.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    double3 operator+( double b, double3 a ) 
+{ 
+    return make_double3(a.x + b, a.y + b, a.z + b); 
+}
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double2 addition assignment.
+/// 
+/// \f$ \mathbf{\vec{a}} = \mathbf{\vec{a}} + \mathbf{\vec{b}} \f$.
+/// \param[in,out] a \p double2.
+/// \param[in] b \p double2.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    void operator+=( double2 &a, double2 b ) { a.x += b.x; a.y += b.y; }
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double3 addition assignment.
+/// 
+/// \f$ \mathbf{\vec{a}} = \mathbf{\vec{a}} + \mathbf{\vec{b}} \f$.
+/// \param[in,out] a \p double3.
+/// \param[in] b \p double3.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    void operator+=( double3 &a, double3 b ) 
+{ 
+    a.x += b.x; 
+    a.y += b.y; 
+    a.z += b.z; 
+}
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double2 addition assignment with scalar \p double.
+/// 
+/// \f$ \mathbf{\vec{a}} = \mathbf{\vec{a}} + b \f$.
+/// \param[in,out] a \p double2.
+/// \param[in] b \p double.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    void operator+=( double2 &a, double b ) { a.x += b; a.y += b; }
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double3 addition assignment with scalar \p double.
+/// 
+/// \f$ \mathbf{\vec{a}} = \mathbf{\vec{a}} + b \f$.
+/// \param[in,out] a \p double3.
+/// \param[in] b \p double.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    void operator+=( double3 &a, double b ) { a.x += b; a.y += b; a.z += b; }
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double2 subtraction.
+/// 
+/// \param[in] a \p double2.
+/// \param[in] b \p double2.
+/// \return \f$ \mathbf{\vec{a}} - \mathbf{\vec{b}} \f$.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    double2 operator-( double2 a, double2 b ) 
+{ 
+    return make_double2( a.x - b.x, a.y - b.y ); 
+}
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double3 subtraction.
+/// 
+/// \param[in] a \p double3.
+/// \param[in] b \p double3.
+/// \return \f$ \mathbf{\vec{a}} - \mathbf{\vec{b}} \f$.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    double3 operator-( double3 a, double3 b ) 
+{ 
+    return make_double3( a.x - b.x, a.y - b.y, a.z - b.z ); 
+}
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double2 subtraction assignment.
+/// 
+/// \f$ \mathbf{\vec{a}} = \mathbf{\vec{a}} - \mathbf{\vec{b}} \f$.
+/// \param[in,out] a \p double2.
+/// \param[in] b \p double2.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    void operator-=( double2 &a, double2 b ) { a.x -= b.x; a.y -= b.y; }
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double3 subtraction assignment.
+/// 
+/// \f$ \mathbf{\vec{a}} = \mathbf{\vec{a}} - \mathbf{\vec{b}} \f$.
+/// \param[in,out] a \p double3.
+/// \param[in] b \p double3.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    void operator-=( double3 &a, double3 b ) 
+{ 
+    a.x -= b.x; 
+    a.y -= b.y; 
+    a.z -= b.z; 
+}
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double2 subtraction with scalar \p double.
+/// 
+/// \param[in] a \p double2.
+/// \param[in] b \p double.
+/// \return \f$ \mathbf{\vec{a}} - b \f$.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    double2 operator-( double2 a, double b ) 
+{
+    return make_double2( a.x - b, a.y - b ); 
+}
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double3 subtraction with scalar \p double.
+/// 
+/// \param[in] a \p double3.
+/// \param[in] b \p double.
+/// \return \f$ \mathbf{\vec{a}} - b \f$.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    double3 operator-( double3 a, double b ) 
+{ 
+    return make_double3( a.x - b, a.y - b, a.z - b ); 
+}
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double2 subtraction with scalar \p double.
+/// 
+/// \param[in] b \p double.
+/// \param[in] a \p double2.
+/// \return \f$ b - \mathbf{\vec{a}} \f$.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    double2 operator-( double b, double2 a ) 
+{ 
+    return make_double2( b - a.x, b - a.y ); 
+}
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double3 subtraction with scalar \p double.
+/// 
+/// \param[in] b \p double.
+/// \param[in] a \p double3.
+/// \return \f$ b - \mathbf{\vec{a}} \f$.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    double3 operator-( double b, double3 a ) 
+{ 
+    return make_double3( b - a.x, b - a.y, b - a.z ); 
+}
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double2 subtraction assignment with scalar \p double.
+/// 
+/// \f$ \mathbf{\vec{a}} = \mathbf{\vec{a}} - b \f$.
+/// \param[in,out] a \p double2.
+/// \param[in] b \p double.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    void operator-=( double2 &a, double b ) { a.x -= b;  a.y -= b; }
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double3 subtraction assignment with scalar \p double.
+/// 
+/// \f$ \mathbf{\vec{a}} = \mathbf{\vec{a}} - b \f$.
+/// \param[in,out] a \p double3.
+/// \param[in] b \p double.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    void operator-=( double3 &a, double b ) { a.x -= b;  a.y -= b; a.z -= b; }
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double2 element-wise multiplication.
+///
+/// \param[in] a \p double2.
+/// \param[in] b \p double2.
+/// \returns \f$ \begin{bmatrix} a_{x} \cdot b_{x} \\ a_{y} \cdot b_{y} 
+///          \end{bmatrix} \f$.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    double2 operator*( double2 a, double2 b ) 
+{ 
+    return make_double2(a.x * b.x, a.y * b.y); 
+}
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double2 element-wise multiplication assignment.
+/// 
+/// \f$ \mathbf{\vec{a}} = \begin{bmatrix} a_{x} \cdot b_{x} \\ a_{y} 
+/// \cdot b_{y} \end{bmatrix} \f$.
+/// \param[in,out] a \p double2.
+/// \param[in] b \p double2.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    void operator*=( double2 &a, double2 b ) { a.x *= b.x; a.y *= b.y; }
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double2 multiplication with scalar \p double.
+/// 
+/// \param[in] a \p double2.
+/// \param[in] b \p double.
+/// \returns \f$ \mathbf{\vec{a}} \cdot b \f$.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    double2 operator*( double2 a, double b ) 
+{ 
+    return make_double2( a.x * b, a.y * b ); 
+}
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double2 multiplication with scalar \p double.
+/// 
+/// \param[in] b \p double.
+/// \param[in] a \p double2.
+/// \returns \f$ b \cdot \mathbf{\vec{a}} \f$.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    double2 operator*( double b, double2 a ) 
+{ 
+    return make_double2(b * a.x, b * a.y); 
+}
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double2 multiplication assignment with scalar \p double.
+/// 
+/// \f$ \mathbf{\vec{a}} = \mathbf{\vec{a}} \cdot b \f$.
+/// \param[in,out] a \p double2.
+/// \param[in] b \p double.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    void operator*=( double2 &a, double b ) { a.x *= b; a.y *= b; }
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double2 element-wise division.
+/// 
+/// \param[in] a \p double2.
+/// \param[in] b \p double2.
+/// \returns \f$ \begin{bmatrix} a_{x} / b_{x} \\ a_{y} / b_{y} 
+///          \end{bmatrix} \f$.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    double2 operator/( double2 a, double2 b ) 
+{ 
+    return make_double2( a.x / b.x, a.y / b.y ); 
+}
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double2 element-wise division assignment.
+///
+/// \todo Try to find a way to deal with double back slashes in a way that 
+///       doesn't make the c++ preprocessor complain about multi-line 
+///       comments.
+///  
+/// \f$ \mathbf{\vec{a}} = \begin{bmatrix} a_{x} / b_{x} \\ 
+/// a_{y} / b_{y} \end{bmatrix} \f$.
+/// \param[in,out] a \p double2.
+/// \param[in] b \p double2.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    void operator/=( double2 &a, double2 b ) { a.x /= b.x; a.y /= b.y; }
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double2 division with scalar \p double.
+/// 
+/// \param[in] a \p double2.
+/// \param[in] b \p double.
+/// \returns \f$ \mathbf{\vec{a}} \cdot \dfrac{1}{b} \f$.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    double2 operator/( double2 a, double b ) 
+{ 
+    return make_double2( a.x / b, a.y / b ); 
+}
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double2 division assignment with scalar \p double.
+/// 
+/// \f$ \mathbf{\vec{a}} = \mathbf{\vec{a}} \cdot \dfrac{1}{b} \f$.
+/// \param[in,out] a \p double2.
+/// \param[in] b \p double.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    void operator/=( double2 &a, double b ) { a.x /= b; a.y /= b; }
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double2 division with scalar \p double.
+/// 
+/// \param[in] b \p double.
+/// \param[in] a \p double2.
+/// \returns \f$ b \cdot \begin{bmatrix} 1 / a_{x} \\ 1 / a_{y}
+///          \end{bmatrix} \f$.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    double2 operator/( double b, double2 a ) 
+{ 
+    return make_double2( b / a.x, b / a.y ); 
+}
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double3 element-wise multiplication.
+/// 
+/// \param[in] a \p double3.
+/// \param[in] b \p double3.
+/// \returns \f$ \begin{bmatrix} a_{x} \cdot b_{x} \\ a_{y} \cdot b_{y} 
+///          \\ a_{z} \cdot b_{z} \end{bmatrix} \f$.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    double3 operator*( double3 a, double3 b ) 
+{ 
+    return make_double3( a.x * b.x, a.y * b.y, a.z * b.z ); 
+}
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double3 element-wise multiplication assignment.
+/// 
+/// \f$ \mathbf{\vec{a}} = \begin{bmatrix} a_{x} \cdot b_{x} \\ a_{y} 
+/// \cdot b_{y} \\ a_{z} \cdot b_{z} \end{bmatrix} \f$.
+/// \param[in,out] a \p double3.
+/// \param[in] b \p double3.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    void operator*=( double3 &a, double3 b ) 
+{ 
+    a.x *= b.x; a.y *= b.y; a.z *= b.z; 
+}
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double3 multiplication with scalar \p double.
+/// 
+/// \param[in] a \p double3.
+/// \param[in] b \p double.
+/// \returns \f$ \mathbf{\vec{a}} \cdot b \f$.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    double3 operator*( double3 a, double b ) 
+{ 
+    return make_double3( a.x * b, a.y * b, a.z * b ); 
+}
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double3 multiplication with scalar \p double.
+/// 
+/// \param[in] b \p double.
+/// \param[in] a \p double3.
+/// \returns \f$ b \cdot \mathbf{\vec{a}} \f$.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    double3 operator*( double b, double3 a ) 
+{ 
+    return make_double3( b * a.x, b * a.y, b * a.z ); 
+}
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double3 multiplication assignment with scalar \p double.
+/// 
+/// \f$ \mathbf{\vec{a}} = \mathbf{\vec{a}} \cdot b \f$.
+/// \param[in,out] a \p double3.
+/// \param[in] b \p double.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    void operator*=( double3 &a, double b ) { a.x *= b; a.y *= b; a.z *= b; }
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double3 element-wise division.
+/// 
+/// \param[in] a \p double3.
+/// \param[in] b \p double3.
+/// \returns \f$ \begin{bmatrix} a_{x} / b_{x} \\ a_{y} / b_{y} \\ 
+///          a_{z} / b_{z} \end{bmatrix} \f$.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    double3 operator/( double3 a, double3 b ) 
+{ 
+    return make_double3( a.x / b.x, a.y / b.y, a.z / b.z ); 
+}
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double3 element-wise division assignment.
+/// 
+/// \f$ \mathbf{\vec{a}} = \begin{bmatrix} a_{x} / b_{x} \\ 
+/// a_{y} / b_{y} \\ a_{z} / b_{z} \end{bmatrix} \f$.
+/// \param[in,out] a \p double3.
+/// \param[in] b \p double3.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    void operator/=( double3 &a, double3 b ) 
+{ 
+    a.x /= b.x; 
+    a.y /= b.y; 
+    a.z /= b.z; 
+}
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double3 division with scalar \p double.
+/// 
+/// \param[in] a \p double3.
+/// \param[in] b \p double.
+/// \returns \f$ \mathbf{\vec{a}} \cdot \dfrac{1}{b} \f$.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    double3 operator/( double3 a, double b ) 
+{ 
+    return make_double3( a.x / b, a.y / b, a.z / b ); 
+}
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double3 division assignment with scalar \p double.
+/// 
+/// \f$ \mathbf{\vec{a}} = \mathbf{\vec{a}} \cdot \dfrac{1}{b} \f$.
+/// \param[in,out] a \p double3.
+/// \param[in] b \p double.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    void operator/=( double3 &a, double b ) { a.x /= b; a.y /= b; a.z /= b; }
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double3 division with scalar \p double.
+/// 
+/// \param[in] b \p double.
+/// \param[in] a \p double3.
+/// \returns \f$ b \cdot \begin{bmatrix} 1 / a_{x} \\ 1 / a_{y} \\ 
+///          1 / a_{z} \end{bmatrix} \f$.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    double3 operator/( double b, double3 a ) 
+{ 
+    return make_double3( b / a.x, b / a.y, b / a.z ); 
+}
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double3 factory function.
+/// 
+/// \param[in] a \p float3 to be converted to \p double3.
+/// \return \p a converted to \p double3.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    double3 make_double3( float3 a ) { return make_double3( a.x, a.y, a.z ); }
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double2 dot product.
+/// 
+/// \param[in] a \p double2.
+/// \param[in] b \p double2.
+/// \return \f$ \sum_{i=0}^{1} a_{i} \cdot b_{i} \f$.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    double dot( double2 a, double2 b ) { return a.x * b.x + a.y * b.y; }
+///////////////////////////////////////////////////////////////////////////////
+/// \brief \p double3 dot product.
+/// 
+/// \param[in] a \p double3.
+/// \param[in] b \p double3.
+/// \return \f$ \sum_{i=0}^{2} a_{i} \cdot b_{i} \f$.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    double dot( double3 a, double3 b ) 
+{ 
+    return a.x * b.x + a.y * b.y + a.z * b.z; 
+}
+///////////////////////////////////////////////////////////////////////////////
+/// \brief Normalizes a \p double2 vector.
+/// 
+/// \param[in] v \p double2.
+/// \return \f$ \mathbf{\vec{v}} \cdot \left( \sqrt{ \mathbf{\vec{v}} \cdot 
+///         \mathbf{\vec{v}} } \right)^{-1} \f$.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    double2 normalize( double2 v ) { return v / sqrt( dot( v, v ) ); }
+///////////////////////////////////////////////////////////////////////////////
+/// \brief Normalizes a \p double3 vector.
+/// 
+/// \param[in] v \p double3.
+/// \return \f$ \mathbf{\vec{v}} \cdot \left( \sqrt{ \mathbf{\vec{v}} \cdot 
+///         \mathbf{\vec{v}} } \right)^{-1} \f$.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    double3 normalize( double3 v ) { return v / sqrt( dot( v, v ) ); }
+///////////////////////////////////////////////////////////////////////////////
+/// \brief Cross product for \p double3.
+/// 
+/// \param[in] a \p double3.
+/// \param[in] b \p double3.
+/// \return \f$ a \times b \f$.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ 
+    double3 cross( double3 a, double3 b ) 
+{ 
+    return make_double3( a.y*b.z - a.z*b.y
+                       , a.z*b.x - a.x*b.z
+                       , a.x*b.y - a.y*b.x ); 
+}
+#endif // _DOUBLE2_DOUBLE3_MATH_
 
 #endif

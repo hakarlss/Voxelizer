@@ -1,6 +1,6 @@
 #include "voxelizer.h"
-#include "global_functions.h"
-#include "dev_functions.h"
+#include "common.h"
+#include "host_device_interface.h"
 
 #include <thrust/device_vector.h>
 #include <thrust/sort.h>

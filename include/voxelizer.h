@@ -630,8 +630,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "node_types.h"
-#include "aux_definitions.h"
-
+#include "host_support.h"
 #include "helper_math.h"
 
 #include <iostream>

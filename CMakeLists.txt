@@ -12,18 +12,15 @@ file( GLOB SOURCE_FILES . src/*.cpp src/*.cu )
 file( GLOB HEADER_FILES . include/*.h )
 
 # Limits the configuration types available. Doesn't seem to work, though...
-set( CMAKE_CONFIGURATION_TYPES "Debug;Release" )
+set( CMAKE_CONFIGURATION_TYPES Release Debug )
 
-option( CMAKE_BUILD_SHARED_LIBS	"Choose to build either shared or static libraries." OFF )
-option( CMAKE_BUILD_TYPE "Build type (Debug/Release) for single-configuration build systems." "Release" )
-
-# Boost options.
-if ( CMAKE_BUILD_SHARED_LIBS )
-	set( Boost_USE_STATIC_LIBS OFF )
-else ()
-	set( Boost_USE_STATIC_LIBS ON )
+if ( UNIX )
+	#option( CMAKE_BUILD_SHARED_LIBS	"Choose to build either shared or static libraries." OFF )
+	set( CMAKE_BUILD_TYPE Release CACHE STRING "Build type (Debug/Release) for single-configuration build systems." )
 endif ()
 
+# Boost options.
+set( Boost_USE_STATIC_LIBS ON )
 set( Boost_USE_MULTITHREADED ON )
 set( Boost_USE_STATIC_RUNTIME OFF )
 set( Boost_NO_BOOST_CMAKE ON )
@@ -74,7 +71,7 @@ set( CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -w" )
 set( CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -w" )
 endif ()
 
-message( STATUS "R Flags: ${CMAKE_CXX_FLAGS_RELEASE}" )
+#message( STATUS "R Flags: ${CMAKE_CXX_FLAGS_RELEASE}" )
 	
 # Include files from the subdirectories and process the CMakeLists.txt in those 
 # directories.

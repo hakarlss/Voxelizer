@@ -2,10 +2,10 @@
 #pragma once
 #endif
 
-#ifndef NODE_TYPES_H
-#define NODE_TYPES_H
+#ifndef VOX_NODE_TYPES_H
+#define VOX_NODE_TYPES_H
 
-#include "aux_definitions.h"
+#include "common.h"
 
 namespace vox {
 
