@@ -4622,7 +4622,7 @@ inline __host__ __device__ float volumeOfPolyhedron
     volume += volumeOfPyramid(iPts, nrOfIPts, height);
 
     // Rotate the face1 polygon.
-    if (nrF1 > 0)
+    if (nrF1 > 2)
     {
         rotN = normalize(cross(face1[0] - face1[2], face1[1] - face1[0]));
         height = voxVerts[0];
@@ -4657,7 +4657,7 @@ inline __host__ __device__ float volumeOfPolyhedron
     }
 
     // Rotate the face2 polygon.
-    if (nrF2 > 0)
+    if (nrF2 > 2)
     {
         rotN = normalize(cross(face2[0] - face2[2], face2[1] - face2[0]));
         height = voxVerts[0];
@@ -4692,7 +4692,7 @@ inline __host__ __device__ float volumeOfPolyhedron
     }
 
     // Rotate the face3 polygon.
-    if (nrF3 > 0)
+    if (nrF3 > 2)
     {
         rotN = normalize(cross(face3[0] - face3[2], face3[1] - face3[0]));
         height = voxVerts[0];
