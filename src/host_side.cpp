@@ -581,6 +581,8 @@ std::vector<NodePointer<Node> >  Voxelizer<Node>::voxelize( uint  maxDimension,
 
     result = this->collectData();
 
+    this->deallocate();
+
     // Return the pointer to the voxel data.
     return result;
 }
@@ -636,6 +638,8 @@ std::vector<NodePointer<Node> >  Voxelizer<Node>::voxelize( double cubeLength,
                        , NULL );
 
     result = this->collectData();
+
+    this->deallocate();
 
     // Return the pointer to the voxel data.
     return result;
@@ -1746,6 +1750,8 @@ std::vector<NodePointer<Node> > Voxelizer<Node>::voxelizeToNodes(
 
     result = this->collectData();
 
+    this->deallocate();
+
     return result;
 }
 ///////////////////////////////////////////////////////////////////////////////
@@ -1798,6 +1804,8 @@ std::vector<NodePointer<Node> > Voxelizer<Node>::voxelizeToNodes(
 
     result = this->collectData();
 
+    this->deallocate();
+
     return result;
 }
 ///////////////////////////////////////////////////////////////////////////////
@@ -1835,6 +1843,8 @@ NodePointer<Node> Voxelizer<Node>::voxelizeToNodesToRAM(
 
     result = this->collectData( this->devices[0], true );
 
+    this->deallocate();
+
     return result;
 }
 ///////////////////////////////////////////////////////////////////////////////
@@ -1865,6 +1875,8 @@ NodePointer<Node> Voxelizer<Node>::voxelizeToNodesToRAM(
     this->voxelizeEntry( make_uint2( 1 ), voxSplitRes, matSplitRes, NULL );
 
     result = this->collectData( this->devices[0], true );
+
+    this->deallocate();
 
     return result;
 }
@@ -2277,6 +2289,8 @@ NodePointer<Node> Voxelizer<Node>::voxelizeToRAM( uint  maxDimension,
 
     result = this->collectData( this->devices[0], true );
 
+    this->deallocate();
+
     return result;
 }
 ///////////////////////////////////////////////////////////////////////////////
@@ -2312,6 +2326,8 @@ NodePointer<Node> Voxelizer<Node>::voxelizeToRAM( double cubeLength,
         , NULL );
 
     result = this->collectData( this->devices[0], true );
+
+    this->deallocate();
 
     return result;
 }
