@@ -118,7 +118,8 @@ __global__ void process1DTriangles(float const * vertices,
                                    float		 voxelLength,
                            Bounds<uint3>	     totalResolution,
                            Bounds<uint3>         subSpace,
-                                     int         gridType  );
+                                     int         gridType,
+                                    bool         countVoxels );
 /// Kernel that surface voxelizes triangles with a 2D bounding box.
 template <class Node>
 __global__ void process2DTriangles(float const * vertices, 
@@ -137,7 +138,8 @@ __global__ void process2DTriangles(float const * vertices,
                                    float		 voxelLength,
                            Bounds<uint3>	     totalResolution,
                            Bounds<uint3>         subSpace,
-                                     int         gridType  );
+                                     int         gridType,
+                                    bool         countVoxels );
 /// Kernel that surface voxelizes triangles with a 3D bounding box.
 template <class Node>
 __global__ void process3DTriangles(float const * vertices, 
@@ -156,11 +158,17 @@ __global__ void process3DTriangles(float const * vertices,
                                    float		 voxelLength,
                            Bounds<uint3>	     totalResolution,
                            Bounds<uint3>         subSpace,
-                                     int         gridType );
+                                     int         gridType,
+                                    bool         countVoxels );
 /// Kernel that makes the outermost Nodes zero.
 template <class Node>
 __global__ void zeroPadding( Node  * nodes,
                              const uint3   dimensions );
+
+template <class Node>
+__global__ void fillHashMap( Node * nodes
+                           , HashMap map
+                           , const uint3 dim );
 
 /// Implements the tile loop for calculateTileOverlap().
 inline __host__ __device__ 
@@ -307,7 +315,7 @@ inline __host__ __device__
 inline __host__ __device__ 
     bool overlapTestXY( OverlapData data, float3 p );
 /// Writes the voxel to memory once an overlap has been confirmed.
-template <class Node> __host__ __device__ 
+template <class Node> __device__ 
     void processVoxel( Node * nodes
                      , uchar const * materials
                      , uint triangleIdx
@@ -320,9 +328,10 @@ template <class Node> __host__ __device__
                      , int z
                      , int gridType
                      , uint3 resolution
+                     , bool countVoxels
                      );
 /// Writes a PartialNode to memory.
-template <> __host__ __device__ 
+template <> __device__ 
     void processVoxel<PartialNode>( PartialNode * nodes
                                   , uchar const * materials
                                   , uint triangleIdx
@@ -335,6 +344,7 @@ template <> __host__ __device__
                                   , int z
                                   , int gridType
                                   , uint3 resolution
+                                  , bool countVoxels
                                   );
 /// Determines the type of a triangle's bounding box.
 inline __host__ __device__ 

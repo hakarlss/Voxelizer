@@ -9,7 +9,7 @@
 #include <sm_11_atomic_functions.h>
 #include <sm_12_atomic_functions.h>
 #include <sm_20_atomic_functions.h>
-#include <sm_35_atomic_functions.h>
+//#include <sm_35_atomic_functions.h>
 
 #include <thrust/host_vector.h>
 #include <thrust/functional.h>
@@ -108,6 +108,30 @@ void compactWorkQueue(
     thrust::device_free(iv);
 
     checkCudaErrors( "compactWorkQueue" );
+}
+///////////////////////////////////////////////////////////////////////////////
+///
+///////////////////////////////////////////////////////////////////////////////
+template <class Node>
+void calcSurfNodeCount
+    ( CommonDevData & devData
+    , Node * nodes
+    , clock_t startTime
+    , bool verbose
+    )
+{
+    if (verbose) 
+        std::cout << (clock() - startTime) << ": Calling calcSurfNodeCount\n";
+
+    thrust::device_ptr<Node> nDevPtr( nodes );
+
+    uint count = thrust::count_if( nDevPtr
+                                 , nDevPtr + devData.nrOfNodes
+                                 , neq_0<Node>() );
+
+    devData.nrOfSurfaceNodes = count;
+
+    checkCudaErrors( "calcSurfNodeCount" );
 }
 ///////////////////////////////////////////////////////////////////////////////
 /// Handles the calculating of the <em>tile overlap buffer</em> by calling the 
@@ -623,6 +647,7 @@ void calcOptSurfaceVoxelization(
     Node                 * nodes_gpu, 
     Bounds<uint3>  const & subSpace,
     int                    gridType,
+    bool                   countVoxels,
     clock_t                startTime, 
     bool                   verbose )
 {
@@ -660,7 +685,8 @@ void calcOptSurfaceVoxelization(
                                      float(hostData.voxelLength),
                                      devData.extResolution,
                                      subSpace,
-                                     gridType );
+                                     gridType,
+                                     countVoxels );
     }
 
     // Process and voxelize triangles with a 2-dimensional bounding box.
@@ -690,7 +716,8 @@ void calcOptSurfaceVoxelization(
                                      float(hostData.voxelLength),
                                      devData.extResolution,
                                      subSpace,
-                                     gridType );
+                                     gridType,
+                                     countVoxels );
     }
 
     // Process and voxelize triangles with a 3-dimensional bounding box.
@@ -720,7 +747,8 @@ void calcOptSurfaceVoxelization(
                                      float(hostData.voxelLength),
                                      devData.extResolution,
                                      subSpace,
-                                     gridType );
+                                     gridType,
+                                     countVoxels );
     }
 
     checkCudaErrors( "calcOptSurfaceVoxelization" );
@@ -803,6 +831,36 @@ void restoreRotatedNodes( CommonDevData const & devData,
                                          yzSubSpace );
 
     checkCudaErrors( "restoreRotatedNodes" );
+}
+///////////////////////////////////////////////////////////////////////////////
+///
+///////////////////////////////////////////////////////////////////////////////
+template <class Node>
+void populateHashMap
+    ( CommonDevData const & devData
+    , Node                * nodes_gpu
+    , HashMap             & hashMap
+    , clock_t               startTime
+    , bool                  verbose )
+{
+    if ( !Node::usesTwoArrays() )
+        return;
+
+    const uint blocks = 1;
+    const dim3 threadsPerBlock(32, 32);
+
+    if (verbose) 
+        std::cout << (clock() - startTime) << ": Calling populateHashMap"
+                     "<<<" << blocks << ", (32,32)\n";
+
+    uint3 dim = devData.allocResolution.max - devData.allocResolution.min;
+    
+    fillHashMap<Node>
+        <<< blocks, threadsPerBlock >>>( nodes_gpu, 
+                                         hashMap,
+                                         dim );
+
+    checkCudaErrors( "populateHashMap" );
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -2348,7 +2406,8 @@ __global__ void SimpleSurfaceVoxelizer
                                         , j
                                         , k
                                         , 1
-                                        , resolution );
+                                        , resolution
+                                        , false );
                     }
                 }
             }
@@ -2958,6 +3017,7 @@ inline __device__ void processVoxel
     , int z                   ///< [in] Z coordinate of the voxel.
     , int gridType            ///< [in] How the grid is shifted - 1 for normal.
     , uint3 resolution        ///< [in] Dimensions of the device's voxel space.
+    , bool countVoxels
     )
 {
     uint nodeIdx = 0;
@@ -2978,14 +3038,24 @@ inline __device__ void processVoxel
     }
     else
     {   // The node is to be written into a normal grid.
+
         const uint l = resolution.x;
         const uint a = l * resolution.y;
 
         nodeIdx = a * uint(z) + l * uint(y) + uint(x);
     }
 
-    // Make the node solid and set its material.
-    nodes[nodeIdx] = Node( 1, materials[triangleIdx] );
+    if ( countVoxels )
+    {
+        // This should work as long as the addition doesn't make the chars 
+        // overflow, and the Node type only contains a single variable.
+        atomicAdd( (int32_t*)&nodes[nodeIdx], 1 );
+    }
+    else
+    {
+        // Make the node solid and set its material.
+        nodes[nodeIdx] = Node( 1, materials[triangleIdx] );
+    }
 }
 ///////////////////////////////////////////////////////////////////////////////
 /// Writes the voxel to memory once an overlap has been confirmed. A 
@@ -3009,6 +3079,7 @@ inline __device__ void processVoxel<PartialNode>
     , int z                   ///< [in] Z coordinate of the voxel.
     , int gridType            ///< [in] How the grid is shifted - 1 for normal.
     , uint3 resolution        ///< [in] Dimensions of the device's voxel space.
+    , bool countVoxels
     )
 {
     uint nodeIdx;
@@ -3305,27 +3376,30 @@ inline __host__ __device__
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node>
 __global__ void process1DTriangles
-    ( float const * vertices        ///< [in] Vertices of the model.
-    , uint const * indices          ///< [in] Indices of the model.
-    , uint const * triTypes         ///< [in] Triangle classifications.
-    , uint const * triangles        /**< [in] Classification to triangle 
-                                              mapping. */
-    , uchar const * materials       ///< [in] Triangle to material mapping.
-    , Node * nodes                  ///< [out] Array of nodes.
-    , uint triStartIndex            /**< [in] Starting index for this triangle 
-                                              type. */
-    , uint triEndIndex              ///< [in] End index for this triangle type.
-    , bool left                     ///< [in] Other device on the left?
-    , bool right                    ///< [in] Other device on the right?
-    , bool up                       ///< [in] Other device above?
-    , bool down                     ///< [in] Other device below?
-    , float3 modelBBMin             /**< [in] Minimum corner of the device's 
-                                              voxelization space. */
-    , float	voxelLength             ///< [in] Distance between voxel centers.
-    , Bounds<uint3> totalResolution /**< [in] Bounding box of the device's 
-                                              voxelization space. */
-    , Bounds<uint3> subSpace        ///< [in] Bounding box of the subspace.
-    , int gridType                  ///< [in] Which of the four grids to use.
+    ( float const * vertices  ///< [in] Vertices of the model.
+    , uint const * indices    ///< [in] Indices of the model.
+    , uint const * triTypes   ///< [in] Triangle classifications.
+    , uint const * triangles  ///< [in] Classification to triangle mapping.
+    , uchar const * materials ///< [in] Triangle to material mapping.
+    , Node * nodes            ///< [out] Array of nodes.
+    , uint triStartIndex      ///< [in] Starting index for this triangle type.
+    , uint triEndIndex        ///< [in] End index for this triangle type.
+    , bool left               ///< [in] Other device on the left?
+    , bool right              ///< [in] Other device on the right?
+    , bool up                 ///< [in] Other device above?
+    , bool down               ///< [in] Other device below?
+    , float3 modelBBMin       ///< [in] Minimum corner of the device's 
+                              ///<      voxelization space.
+                              ///<
+    , float	voxelLength       ///< [in] Distance between voxel centers.
+    , Bounds<uint3> totalResolution ///< [in] Bounding box of the device's 
+                                    ///<      voxelization space.
+                                    ///<
+    , Bounds<uint3> subSpace  ///< [in] Bounding box of the subspace.
+    , int gridType            ///< [in] Which of the four grids to use.
+    , bool countVoxels        ///< [in] \p true to forego the normal 
+                              ///<      voxelization and instead calculate the 
+                              ///<      number of overlaps per voxel.
     )
 {
     float3 triangle[3];
@@ -3389,7 +3463,8 @@ __global__ void process1DTriangles
                 processVoxel( nodes,       materials,         triIdx,      
                               triangle,    make_float3(0.0f), modelBBMin, 
                               voxelLength, i,                 voxBB.min.y, 
-                              voxBB.min.z, gridType,          res );
+                              voxBB.min.z, gridType,          res,
+                              countVoxels );
         }
         else if (domAxis == yAxis)
         {
@@ -3397,7 +3472,8 @@ __global__ void process1DTriangles
                 processVoxel( nodes,       materials,         triIdx, 
                               triangle,    make_float3(0.0f), modelBBMin, 
                               voxelLength, voxBB.min.x,       j, 
-                              voxBB.min.z, gridType,          res );
+                              voxBB.min.z, gridType,          res,
+                              countVoxels );
         }
         else
         {
@@ -3405,7 +3481,8 @@ __global__ void process1DTriangles
                 processVoxel( nodes,       materials,         triIdx, 
                               triangle,    make_float3(0.0f), modelBBMin, 
                               voxelLength, voxBB.min.x,       voxBB.min.y, 
-                              k,           gridType,          res );
+                              k,           gridType,          res,
+                              countVoxels );
         }
     }
 }
@@ -3438,6 +3515,7 @@ __global__ void process2DTriangles
                                               voxelization space. */
     , Bounds<uint3> subSpace        ///< [in] Bounding box of the subspace.
     , int gridType                  ///< [in] Which of the four grids to use.
+    , bool countVoxels
     )
 {
     float3 triangle[3], triNormal, p;
@@ -3524,7 +3602,8 @@ __global__ void process2DTriangles
                                       j + adjs.y, 
                                       k + adjs.z,
                                       gridType,
-                                      res );
+                                      res,
+                                      countVoxels );
                 }
             }
         }
@@ -3556,7 +3635,8 @@ __global__ void process2DTriangles
                                       voxBB.min.y + adjs.y,
                                       k + adjs.z, 
                                       gridType,
-                                      res );
+                                      res,
+                                      countVoxels );
                 }
             }
         }
@@ -3588,7 +3668,8 @@ __global__ void process2DTriangles
                                       j + adjs.y, 
                                       voxBB.min.z + adjs.z, 
                                       gridType,
-                                      res );
+                                      res,
+                                      countVoxels );
                 }
             }
         }
@@ -3623,6 +3704,7 @@ __global__ void process3DTriangles
                                               voxelization space. */
     , Bounds<uint3> subSpace        ///< [in] Bounding box of the subspace.
     , int gridType                  ///< [in] Which of the four grids to use.
+    , bool countVoxels
     )
 {
     float3 triangle[3], triNormal, p;
@@ -3739,7 +3821,8 @@ __global__ void process3DTriangles
                                           j + adjs.y, 
                                           k + adjs.z, 
                                           gridType,
-                                          res );
+                                          res,
+                                          countVoxels );
                         else
                         {
                             // Perform remaining overlap tests on max 3 voxels.
@@ -3766,7 +3849,8 @@ __global__ void process3DTriangles
                                                       j + adjs.y, 
                                                       k + adjs.z, 
                                                       gridType,
-                                                      res );
+                                                      res,
+                                                      countVoxels );
                                     }
                                 }
                             }
@@ -3826,7 +3910,8 @@ __global__ void process3DTriangles
                                           voxRange.x + adjs.y, 
                                           k + adjs.z, 
                                           gridType,
-                                          res );
+                                          res,
+                                          countVoxels );
                         else
                         {
                             // Perform remaining overlap tests on max 3 voxels.
@@ -3853,7 +3938,8 @@ __global__ void process3DTriangles
                                                       j + adjs.y, 
                                                       k + adjs.z, 
                                                       gridType,
-                                                      res );
+                                                      res,
+                                                      countVoxels );
                                     }
                                 }
                             }
@@ -3915,7 +4001,8 @@ __global__ void process3DTriangles
                                           j + adjs.y, 
                                           voxRange.x + adjs.z, 
                                           gridType,
-                                          res );
+                                          res,
+                                          countVoxels );
                         else
                         {
                             // Perform remaining overlap tests on max 3 voxels.
@@ -3942,7 +4029,8 @@ __global__ void process3DTriangles
                                                       j + adjs.y, 
                                                       k + adjs.z, 
                                                       gridType,
-                                                      res );
+                                                      res,
+                                                      countVoxels );
                                     }
                                 }
                             }
@@ -4843,6 +4931,96 @@ __global__ void zeroPadding
     }
 }
 ///////////////////////////////////////////////////////////////////////////////
+///
+///////////////////////////////////////////////////////////////////////////////
+template <class Node>
+__global__ void fillHashMap
+    ( Node * nodes
+    , HashMap map
+    , const uint3 dim
+    )
+{
+    // A single block is running with 1024 threads.
+    // The threads are grouped into 32 warps => (32,32)-configuration.
+    // <<< 1, dim3(32,32,1) >>>
+    // 32 unsigned integers are required to keep track of inter-warp 
+    // highest indices.
+    // 32 bools are required to keep track of the status of each warp.
+
+    // threadIdx.x & threadIdx.y = indices into the (32,32)-config.
+    // blockDim.x & blockDim.y = 32 each
+    // gridDim.x = 1
+    // Define threadIdx.x as the warp index and threadIdx.y as the thread idx.
+
+    __shared__ uint index[33];
+
+    const uint maxNodeIdx = dim.x * dim.y * dim.z;
+    const uint threads = blockDim.x * blockDim.y;
+    const uint maxN = maxNodeIdx + (threads - maxNodeIdx % threads);
+
+    index[threadIdx.x + 1] = 0;
+    if ( threadIdx.x == 0 && threadIdx.y == 0 ) index[0] = 0;
+
+    bool running = true;
+    for ( uint n = blockDim.x * threadIdx.y + threadIdx.x
+        ; n < maxN
+        ; n += blockDim.x * blockDim.y )
+    {
+        __syncthreads();
+
+        if ( n >= maxNodeIdx ) running = false;
+
+        uint count = UINT_MAX;
+
+        if ( running )
+        {
+            const uint nodeType = nodes[n].bid(); 
+            const uint ballot = __ballot( nodeType );
+
+            if ( (1u << threadIdx.y) && ballot == 1u )
+            {
+                bool last = true;
+                count = 0;
+                for ( int i = 0; i < 32; ++i )
+                {
+                    bool p = i < threadIdx.y;
+                    bool isect = ( 1u << i ) && ballot > 0;
+                    count += isect ? !p : 0;
+                    last = p && isect ? false : last;
+                }
+
+                if ( last ) index[threadIdx.x + 1] = count;
+            }
+        }
+
+        __syncthreads();
+
+        if ( threadIdx.x == 0 && threadIdx.y == 0 )
+        {
+            for ( int i = 0; i < 32; ++i )
+            {
+                index[i+1] += index[i];
+            }
+            index[0] += index[32];
+        }
+
+        __syncthreads();
+
+        if ( count != UINT_MAX )
+        {
+            map.insert( n, count - 1 + index[threadIdx.x] );
+        }
+
+        __syncthreads();
+
+        if ( threadIdx.x == 0 && threadIdx.y == 0 )
+        {
+            index[0] += index[32];
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
 /// \brief "Uses" functions to make the compiler include them into the library.
 ///
 /// Dummy functions to force the compiler to instantiate templated functions.
@@ -4872,6 +5050,7 @@ template <class Node> void dummyFunction()
     float * f = NULL;
     uint * u = NULL;
     uchar * c = NULL;
+    HashMap h;
 
     calcNodeList<Node>( dd, v, n, ui2b, t, true );
     launchConvertToFCCGrid<Node>( dd, v, n, ui2b, int(0), t, true );
@@ -4879,9 +5058,11 @@ template <class Node> void dummyFunction()
     launchCalculateFCCBoundaries<Node>( dd, n, n, ui2b, true, t, true );
     calcSurfaceVoxelization<Node>( dd, hd, f, u, n, c, t, true );
     calcOptSurfaceVoxelization<Node>( dd, hd, f, u, u, u, c, n, ui3b, int(0)
-                                    , t, true );
+                                    , false, t, true );
     makePaddingZero<Node>( dd, n, n, true, t, true );
     restoreRotatedNodes<Node>( dd, n, n, ui2b, t, true );
+    calcSurfNodeCount<Node>( dd, n, t, true );
+    populateHashMap<Node>( dd, n, h, t, true );
 }
 ///////////////////////////////////////////////////////////////////////////////
 /// \brief "Uses" functions with every \p Node type to force the compiler to 
@@ -4899,10 +5080,10 @@ void masterDummyFunction()
     Bounds<uint3> ui3b;
     VoxInt * v = NULL;
     clock_t t = 0;
-    bool * b = NULL;
+    //bool * b = NULL;
     float * f = NULL;
     uint * u = NULL;
-    uchar * c = NULL;
+    //uchar * c = NULL;
 
     sortWorkQueue( dd, u, u, t, true );
     compactWorkQueue( dd, u, u, u, t, true );
@@ -4917,5 +5098,7 @@ template void dummyFunction<LongNode>();
 template void dummyFunction<PartialNode>();
 template void dummyFunction<ShortFCCNode>();
 template void dummyFunction<LongFCCNode>();
+template void dummyFunction<VolumeNode>();
+template void dummyFunction<VolumeMapNode>();
 
 } // End namespace vox

@@ -69,10 +69,10 @@ inline void gpuAssert( cudaError_t code
 {
     if ( code != cudaSuccess )
     {
-        std::string message = std::string( cudaGetErrorString( code ) ) + 
-            " in " + std::string( file ) + ", " + toString( line );
+        std::string msg = std::string( file ) + "(" + toString( line ) + 
+            "): " + std::string( cudaGetErrorString( code ) );
 
-        if ( abort ) throw Exception( message );
+        if ( abort ) throw Exception( msg );
     }
 }
 /// Macro that embeds source information into the gpuAsser-function.
@@ -206,6 +206,24 @@ public:
         }
         else
             GPU_ERRCHK( cudaMemset( _ptr, 0, _bytes ) );
+    }
+    ///////////////////////////////////////////////////////////////////////////
+    /// \brief Sets all bits to zero.
+    ///
+    /// \throws Exception if CUDA reports an error.
+    ///////////////////////////////////////////////////////////////////////////
+    void setAllTo( int byte )
+    {
+        int currentDevice = 0;
+        GPU_ERRCHK( cudaGetDevice( &currentDevice ) );
+        if ( _device != currentDevice )
+        {
+            GPU_ERRCHK( cudaSetDevice( _device ) );
+            GPU_ERRCHK( cudaMemset( _ptr, byte, _bytes ) );
+            GPU_ERRCHK( cudaSetDevice( currentDevice ) );
+        }
+        else
+            GPU_ERRCHK( cudaMemset( _ptr, byte, _bytes ) );
     }
     ///////////////////////////////////////////////////////////////////////////
     /// \brief Unallocates the data and resets to default state.
@@ -346,7 +364,7 @@ private:
 ///
 /// \tparam Node type
 ///////////////////////////////////////////////////////////////////////////////
-template <class Node>
+template <class Node, class SNode>
 struct DevContext
 {
     /// Default constructor.
@@ -372,6 +390,7 @@ struct DevContext
     DevPtr<Node> nodesCopy_gpu;          ///< \brief Copy of nodes used in 
                                          ///<        slicing on GPU.
                                          ///<
+    DevPtr<SNode> surfNodes_gpu;         ///<
     DevPtr<bool> error_gpu;			     ///< Error boolean on GPU.
     DevPtr<uint> triangleTypes_gpu;      ///< \brief Triangle classification 
                                          ///<        array on GPU.
@@ -379,6 +398,8 @@ struct DevContext
     DevPtr<uint> sortedTriangles_gpu;    ///< \brief Triangle ids sorted by 
                                          ///<        classification on GPU.
                                          ///<
+
+    HashMap hashMap;                     ///<
     
     // Host pointers.
 

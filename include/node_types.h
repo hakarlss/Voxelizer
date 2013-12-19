@@ -127,6 +127,13 @@ public:
     /// \return \p false.
     ///////////////////////////////////////////////////////////////////////////
     static __host__ __device__ bool isFCCNode() { return false; }
+    ///////////////////////////////////////////////////////////////////////////
+    /// \brief Returns \p true if the \p Node is meant to be used in 
+    ///        conjunction with another \p Node type for surface nodes.
+    ///
+    /// \return \p false.
+    ///////////////////////////////////////////////////////////////////////////
+    static __host__ __device__ bool usesTwoArrays() { return false; }
 private:
     uchar bim; ///< Combined \a boundary and <em>material ids</em>.
 
@@ -245,6 +252,13 @@ public:
     /// \return \p false.
     ///////////////////////////////////////////////////////////////////////////
     static __host__ __device__ bool isFCCNode() { return false; }
+    ///////////////////////////////////////////////////////////////////////////
+    /// \brief Returns \p true if the \p Node is meant to be used in 
+    ///        conjunction with another \p Node type for surface nodes.
+    ///
+    /// \return \p false.
+    ///////////////////////////////////////////////////////////////////////////
+    static __host__ __device__ bool usesTwoArrays() { return false; }
 private:
     uchar _bid;     ///< <em>Boundary id</em>.
     uchar _mat;     ///< <em>Material id</em>.
@@ -390,6 +404,13 @@ public:
     /// \return \p false.
     ///////////////////////////////////////////////////////////////////////////
     static __host__ __device__ bool isFCCNode() { return false; }
+    ///////////////////////////////////////////////////////////////////////////
+    /// \brief Returns \p true if the \p Node is meant to be used in 
+    ///        conjunction with another \p Node type for surface nodes.
+    ///
+    /// \return \p false.
+    ///////////////////////////////////////////////////////////////////////////
+    static __host__ __device__ bool usesTwoArrays() { return false; }
 private:
     uchar _bid;     ///< <em>Boundary id</em>.
     uchar _mat;     ///< <em>Material id</em>.
@@ -547,7 +568,13 @@ public:
     /// \return \p true.
     ///////////////////////////////////////////////////////////////////////////
     static __host__ __device__ bool isFCCNode() { return true; }
-
+    ///////////////////////////////////////////////////////////////////////////
+    /// \brief Returns \p true if the \p Node is meant to be used in 
+    ///        conjunction with another \p Node type for surface nodes.
+    ///
+    /// \return \p false.
+    ///////////////////////////////////////////////////////////////////////////
+    static __host__ __device__ bool usesTwoArrays() { return false; }
 private:
     ushort bim;     ///< Combined boundary and material id.
 
@@ -699,10 +726,118 @@ public:
     /// \return \p true.
     ///////////////////////////////////////////////////////////////////////////
     static __host__ __device__ bool isFCCNode() { return true; }
-
+    ///////////////////////////////////////////////////////////////////////////
+    /// \brief Returns \p true if the \p Node is meant to be used in 
+    ///        conjunction with another \p Node type for surface nodes.
+    ///
+    /// \return \p false.
+    ///////////////////////////////////////////////////////////////////////////
+    static __host__ __device__ bool usesTwoArrays() { return false; }
 private:
     ushort _bid;    ///< Boundary id.
     uchar _mat;     ///< Material id.
+};
+
+///////////////////////////////////////////////////////////////////////////////
+///
+///////////////////////////////////////////////////////////////////////////////
+class VolumeNode
+{
+public:
+    __host__ __device__ VolumeNode(): _bid(0) {}
+    __host__ __device__ VolumeNode( char type ): _bid(type) {}
+    __host__ __device__ VolumeNode( char type, char mat ): _bid(type) {}
+    __host__ __device__ ~VolumeNode() {}
+
+    char _bid;
+
+    __host__ __device__ char mat() { return 0; }
+    __host__ __device__ char bid() { return _bid; }
+    __host__ __device__ float r() { return 0.0f; }
+
+    __host__ __device__ void mat( char m ) {}
+    __host__ __device__ void bid( char b ) {}
+    __host__ __device__ void r( float r ) {}
+
+    ///////////////////////////////////////////////////////////////////////////
+    /// \brief Returns \p true if the \p Node is meant to be used in 
+    ///        conjunction with another \p Node type for surface nodes.
+    ///
+    /// \return \p true.
+    ///////////////////////////////////////////////////////////////////////////
+    static __host__ __device__ bool usesTwoArrays() { return true; }
+    static __host__ __device__ bool isFCCNode() { return false; }
+    static __host__ __device__ uchar maxMat() { return 0; }
+};
+
+///////////////////////////////////////////////////////////////////////////////
+///
+///////////////////////////////////////////////////////////////////////////////
+class VolumeMapNode
+{
+public:
+    __host__ __device__ VolumeMapNode(): _bid(0) {}
+    __host__ __device__ VolumeMapNode( uint32_t i ): _bid(i) {}
+    __host__ __device__ VolumeMapNode( uint32_t type, char mat ): _bid(type) {}
+    __host__ __device__ ~VolumeMapNode() {}
+
+    uint32_t _bid;
+
+    __host__ __device__ uint32_t mat() { return 0; }
+    __host__ __device__ uint32_t bid() { return _bid; }
+    __host__ __device__ float r() { return 0.0f; }
+
+    __host__ __device__ void mat( uint32_t m ) {}
+    __host__ __device__ void bid( uint32_t b ) {}
+    __host__ __device__ void r( float r ) {}
+
+    ///////////////////////////////////////////////////////////////////////////
+    /// \brief Returns \p true if the \p Node is meant to be used in 
+    ///        conjunction with another \p Node type for surface nodes.
+    ///
+    /// \return \p true.
+    ///////////////////////////////////////////////////////////////////////////
+    static __host__ __device__ bool usesTwoArrays() { return true; }
+    static __host__ __device__ bool isFCCNode() { return false; }
+    static __host__ __device__ uchar maxMat() { return 0; }
+};
+
+///////////////////////////////////////////////////////////////////////////////
+/// sizeof(SurfaceNode) = 52
+///////////////////////////////////////////////////////////////////////////////
+class SurfaceNode
+{
+public:
+    SurfaceNode(): orientation(0), material(0), volume(0.0f), 
+        cutNormal(make_float3(0.0f, 0.0f, 0.0f)), cutArea(0.0f), 
+        xPosArea(0.0f), xNegArea(0.0f), yPosArea(0.0f), yNegArea(0.0f), 
+        zPosArea(0.0f), zNegArea(0.0f), mergedNodes(UINT_MAX) {}
+    ~SurfaceNode() {}
+
+    ushort orientation;
+    ushort material;
+
+    float volume;
+
+    float3 cutNormal;
+    float cutArea;
+
+    float xPosArea;
+    float xNegArea;
+    float yPosArea;
+    float yNegArea;
+    float zPosArea;
+    float zNegArea;
+
+    uint mergedNodes;
+
+    ///////////////////////////////////////////////////////////////////////////
+    /// \brief Returns \p true if the \p Node is meant to be used in 
+    ///        conjunction with another \p Node type for surface nodes.
+    ///
+    /// \return \p true.
+    ///////////////////////////////////////////////////////////////////////////
+    static __host__ __device__ bool usesTwoArrays() { return true; }
 };
 
 } // End namespace vox

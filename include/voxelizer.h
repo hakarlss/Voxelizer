@@ -682,6 +682,20 @@ struct NodePointer {
     uint3 dim;          ///< Dimensions of the \p Node grid.
     uint3 loc;          ///< Location of the \p Node grid.
 };
+///////////////////////////////////////////////////////////////////////////////
+///
+///////////////////////////////////////////////////////////////////////////////
+template <class VolumeNode, class SurfaceNode>
+struct Node2APointer {
+    VolumeNode * nodes;      ///< Array of all nodes in the voxelization.
+    SurfaceNode * surfNodes; ///< Array of (large sized) surface nodes.
+    HashMap indices;         ///< Maps coordinates to indices into surfNodes.
+
+    int dev;            ///< Device id the data resides on, if applicable.
+    uint3 dim;          ///< Dimensions of the \p Node grid.
+    uint3 loc;          ///< Location of the \p Node grid.
+    uint nrOfSurfNodes; ///< Size of the surfNodes array.
+};
 
 ///////////////////////////////////////////////////////////////////////////////
 /// \brief Class that encapsulates the voxelizer. 
@@ -701,7 +715,7 @@ struct NodePointer {
 /// \tparam Node Type of \p Node to be used in the result. Applies to all 
 ///              functions that claim to return \p Nodes.
 ///////////////////////////////////////////////////////////////////////////////
-template <class Node = ShortNode>
+template <class Node = ShortNode, class SNode = ShortNode>
 class Voxelizer
 {
 public:
@@ -792,6 +806,37 @@ public:
                           , uint  slice
                           , uint2 voxSplitRes = make_uint2( 1024, 512 )
                           , uint2 matSplitRes = make_uint2( 512, 512 ) );
+
+    std::vector<Node2APointer<Node, SNode> >
+        voxelizeToSurfaceNodes( 
+            double cubeLength, 
+            uint2 devConfig = make_uint2( 1, 1 ),
+            uint3 voxSplitRes = make_uint3( 1024, 512, 512 ), 
+            uint3 matSplitRes = make_uint3( 512, 512, 512 )
+        );
+
+    std::vector<Node2APointer<Node, SNode> >
+        voxelizeToSurfaceNodes( 
+            uint maxDimension, 
+            uint2 devConfig = make_uint2( 1, 1 ),
+            uint3 voxSplitRes = make_uint3( 1024, 512, 512 ), 
+            uint3 matSplitRes = make_uint3( 512, 512, 512 )
+        );
+
+    Node2APointer<Node, SNode>
+        voxelizeToSurfaceNodesToRAM( 
+            double cubeLength, 
+            uint3 voxSplitRes = make_uint3( 1024, 512, 512 ), 
+            uint3 matSplitRes = make_uint3( 512, 512, 512 )
+        );
+
+    Node2APointer<Node, SNode>
+        voxelizeToSurfaceNodesToRAM( 
+            uint maxDimension, 
+            uint3 voxSplitRes = make_uint3( 1024, 512, 512 ), 
+            uint3 matSplitRes = make_uint3( 512, 512, 512 )
+        );
+
     ///////////////////////////////////////////////////////////////////////////
     /// \brief Returns the distance between voxel centers.
     ///
@@ -869,7 +914,7 @@ public:
 
 private:
     /// Array of DevContexts.
-    typedef boost::scoped_array<DevContext<Node> > Devices;
+    typedef boost::scoped_array<DevContext<Node,SNode> > Devices;
 
     // Variable declarations.
 
@@ -900,7 +945,7 @@ private:
     /// Clears all dynamically allocated memory related to the voxelization.
     void deallocate();
     /// Clears the dynamically allocated memory related to plain voxelization.
-    void deallocateVoxelizationData( DevContext<Node> & device );
+    void deallocateVoxelizationData( DevContext<Node,SNode> & device );
     /// Calculates the bounding box of the \p Node / voxel array.
     void determineBBAndResolution();
     /// Calculates the bounding box of the \p Node or voxel array.
@@ -912,7 +957,7 @@ private:
     /// Makes the x-length divisible by 32 times the number of xSplits.
     void adjustResolution( uint xSplits );
     /// Calculates the <em>offset buffer</em>
-    void prepareForConstructWorkQueue( DevContext<Node> & device );
+    void prepareForConstructWorkQueue( DevContext<Node,SNode> & device );
     /// Splits a space into subspaces by constraining each direction.
     SplitData<uint3>
         splitResolutionByMaxDim( uint3 const & maxDimensions
@@ -941,29 +986,29 @@ private:
     void performVoxelization( Bounds<uint2> yzSubSpace
                             , uint			     xRes
                             , uint			     nrOfXSlices
-                            , DevContext<Node> & device );
+                            , DevContext<Node,SNode> & device );
     /// Opens an output \p filestream.
     void openLog( char const * filename );
     /// Writes verious information about the voxelization settings to file.
-    void printGeneralInfo( DevContext<Node> & device );
+    void printGeneralInfo( DevContext<Node,SNode> & device );
     /// Writes the <em>tile overlap array</em> contents to file.
-    void printTileOverlaps( DevContext<Node> & device, MainAxis direction );
+    void printTileOverlaps( DevContext<Node,SNode> & device, MainAxis direction );
     /// Writes the <em>offset buffer</em> contents to file.
-    void printOffsetBuffer( DevContext<Node> & device, MainAxis direction );
+    void printOffsetBuffer( DevContext<Node,SNode> & device, MainAxis direction );
     /// Prints the entire <em>work queue</em> contents to file.
-    void printWorkQueue( DevContext<Node> & device, MainAxis direction );
+    void printWorkQueue( DevContext<Node,SNode> & device, MainAxis direction );
     /// Prints the entire <em>sorted work queue</em> contents to file.
-    void printSortedWorkQueue( DevContext<Node> & device, MainAxis direction );
+    void printSortedWorkQueue( DevContext<Node,SNode> & device, MainAxis direction );
     /// Prints the <em>compacted tile list</em> contents to file.
-    void printCompactedList( DevContext<Node> & device, MainAxis direction );
+    void printCompactedList( DevContext<Node,SNode> & device, MainAxis direction );
     /// Closes the output \p filestream.
     void closeLog();
     /// Helper function to determine some stats about the graphics card.
     inline int convertSMVer2Cores(int major, int minor) const;
     /// Allocates an always fixed amount of memory.
-    void allocStaticMem( DevContext<Node> & device );
+    void allocStaticMem( DevContext<Node,SNode> & device );
     /// Reallocates memory when more is needed.
-    void reAllocDynamicMem( DevContext<Node> & device, float multiplier);
+    void reAllocDynamicMem( DevContext<Node,SNode> & device, float multiplier);
     /// Entry function for every kind of voxelization.
     void voxelizeEntry( uint2 deviceConfig = make_uint2( 1, 1 ), 
                         uint3 voxSplitRes = make_uint3( 1024, 512, 512 ), 
@@ -974,13 +1019,19 @@ private:
                          uint  xSplits, 
                          uint3 voxSplitRes,
                          uint3 matSplitRes,
-                         DevContext<Node> & device );
+                         DevContext<Node,SNode> & device );
+    ///
+    void twoNodeArraysWorker( uint  xRes
+                            , uint  xSplits
+                            , uint3 voxSplitRes
+                            , uint3 matSplitRes
+                            , DevContext<Node,SNode> & device );
     /// Specialized worker function for FCC-related \p Nodes.
     void fccWorker( uint  xRes
                   , uint  xSplits
                   , uint3 voxSplitRes
                   , uint3 matSplitRes
-                  , DevContext<Node> & device );
+                  , DevContext<Node,SNode> & device );
     /// Prepares the voxelizer with a new max array length.
     void setResolution( uint resolution ) { 
         this->hostVars.resolution.min = make_uint3( 0, 0, 0 ); 
@@ -991,11 +1042,11 @@ private:
     /// Restores the coordinates of a vector to their un-rotated form.
     uint3 unRotateCoords( uint3 vec, uint xDim );
     /// Resets certain data structures to their default values.
-    void resetDataStructures( DevContext<Node> & device );
+    void resetDataStructures( DevContext<Node,SNode> & device );
     /// Constructs the <tt>vector<NodePointer></tt> returnable.
     std::vector<NodePointer<Node> > collectData();
     /// Constructs the \p NodePointer returnable.
-    NodePointer<Node> collectData( DevContext<Node> & device
+    NodePointer<Node> collectData( DevContext<Node,SNode> & device
                                  , const bool hostPointers );
 };
 

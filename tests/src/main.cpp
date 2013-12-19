@@ -1924,7 +1924,135 @@ void testFunction()
 {
     std::cout << "Entering test function.\n";
 
-    std::cout << "Exiting test function.\n";
+    const int max_x = 100;
+    const int max_y = 100;
+    const int max_z = 100;
+
+    const int n = max_x * max_y * max_z;
+    const int s = 1.5f * n;
+
+    uint collisions[100] = {0};
+
+    std::cout << "Creating HashMap with size " << s << "\n";
+    std::cout << "It will require " << (sizeof(uint64_t)*s / (1024.0 * 1024.0)) << " MB\n";
+
+    vox::HashMap hashMap( s );
+    hashMap.allocateHost();
+
+    std::cout << "Inserting " << n << " values into HashMap\n";
+
+    bool error = true;
+    uint retries = 0;
+    while ( error )
+    {
+        error = false;
+        for ( int z = 0; z < max_z; ++z )
+        {
+            if ( error ) break;
+            for ( int y = 0; y < max_y; ++y )
+            {
+                if ( error ) break;
+                for ( int x = 0; x < max_x; ++x )
+                {
+                    if ( error ) break;
+                    const uint id = max_x * max_y * z + max_x * y + x;
+                    const uint nrOfCollisions = hashMap.insertHost( id, id );
+                    if ( nrOfCollisions > 100 )
+                    {
+                        error = true;
+                        retries++;
+                    }
+
+                    collisions[nrOfCollisions]++;
+                }
+            }
+        }
+
+        if ( error )
+        {
+            for ( int i = 0; i < 100; ++i )
+                collisions[i] = 0;
+            hashMap.renewHashPrime();
+            hashMap.clearHost();
+        }
+
+        if ( retries > 1000 )
+        {
+            std::cout << "Couldn't create HashMap\n";
+            return;
+        }
+    }
+
+    std::cout << "Created HashMap after " << retries << " retries\n";
+    std::cout << "Retrieving " << n << " values from HashMap\n\n";
+
+    for ( int x = 0; x < max_x; ++x )
+    {
+        for ( int y = 0; y < max_y; ++y )
+        {
+            for ( int z = 0; z < max_z; ++z )
+            {
+                const uint32_t id = max_x * max_y * z + max_x * y + x;
+                const uint32_t result = hashMap.get( id );
+
+                if ( id != result )
+                {
+                    std::cout << "Failed to retrieve ( " << id << " ) from the HashMap\n";
+                    std::cout << "Received " << result << " instead\n";
+                    return;
+                }
+            }
+        }
+    }
+
+    std::cout << "Elements with 00 collisions: " << collisions[0] << "\n";
+
+    for ( int i = 1; i < 100; ++i )
+    {
+        if ( collisions[i] != 0 )
+        {
+            if ( i < 10 )
+                std::cout << "Elements with 0" << i << " collisions: " << collisions[i] << "\n";
+            else
+                std::cout << "Elements with " << i << " collisions: " << collisions[i] << "\n";
+        }
+    }
+
+    uint8_t charArray[12] = { 1, 2, 3, 4, 5, 254, 7, 255, 9, 10, 11, 12 };
+
+    std::cout << "Array of 12 chars read as chars: \n";
+
+    for ( int i = 0; i < 12; ++i )
+        std::cout << uint32_t(charArray[i]) << ", ";
+
+    std::cout << "\n\nArray of 12 chars read as 32-bit integers: \n";
+
+    uint32_t * arrayAsInt = (uint32_t*)charArray;
+
+    for ( int i = 0; i < 12; ++i )
+    {
+        arrayAsInt = (uint32_t*)&charArray[i];
+        uint32_t val = *arrayAsInt;
+
+        //val = val >> (i > 11 - 3 ? 11 - i : 3) * 8;
+        //val = val & uint32_t(UINT8_MAX);
+
+        std::cout << val << ", ";
+
+        *arrayAsInt = val + 1;
+    }
+
+    std::cout << "\n\n";
+
+    std::cout << "Array of 12 chars read as chars: \n";
+
+    for ( int i = 0; i < 12; ++i )
+        std::cout << uint32_t(charArray[i]) << ", ";
+
+    std::cout << "\n\n";
+
+
+    std::cout << "\nExiting test function.\n";
 }
 
 inline std::string printUint3( uint3 & vec )
