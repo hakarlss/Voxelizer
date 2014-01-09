@@ -715,7 +715,7 @@ struct Node2APointer {
 /// \tparam Node Type of \p Node to be used in the result. Applies to all 
 ///              functions that claim to return \p Nodes.
 ///////////////////////////////////////////////////////////////////////////////
-template <class Node = ShortNode, class SNode = ShortNode>
+template <class Node = ShortNode, class SNode = SurfaceNode>
 class Voxelizer
 {
 public:
@@ -1048,6 +1048,10 @@ private:
     /// Constructs the \p NodePointer returnable.
     NodePointer<Node> collectData( DevContext<Node,SNode> & device
                                  , const bool hostPointers );
+    std::vector<Node2APointer<Node, SNode> > collectSurfData();
+    Node2APointer<Node, SNode> collectSurfData( DevContext<Node,SNode> & device
+                                              , const bool         hostPointers
+                                              );
 };
 
 } // End namespace vox

@@ -120,77 +120,11 @@ void performAllSliceTest
     , const boost::program_options::variables_map & vm
     );
 
-class TestClass
-{
-public:
-    TestClass() throw() { 
-        a = "-"; 
-        print( "Default constructor! ( " + a + " )\n" ); 
-    }
-    TestClass( int i ) throw() {
-        a = std::to_string((long long)i);
-        print( std::string( "Constructor with argument " + a + "\n" ) );
-    }
-    TestClass( const TestClass & rhs ) throw() {
-        auto oldA = a;
-        a = rhs.a; 
-        print( "Copy constructor! ( " + oldA + " to " + a + " )\n" ); 
-    }
-    TestClass( TestClass && rhs ) throw() { 
-        auto oldA = a;
-        std::swap( a, rhs.a );
-        print( "Move constructor! ( " + oldA + " to " + a + " )\n" ); 
-    }
-    ~TestClass() { print( "Default destructor! ( " + a + " )\n" );  }
-
-    TestClass & operator=( const TestClass & rhs ) throw() {
-        auto oldA = a;
-        a = rhs.a;
-        print( "Copy assignment! ( " + oldA + " to " + a + " )\n" ); 
-        return *this;
-    }
-    TestClass & operator=( TestClass && rhs ) throw() {
-        auto oldA = a;
-        std::swap( a, rhs.a );
-        print( "Move assignment! ( " + oldA + " to " + a + " )\n" ); 
-        return *this;
-    }
-
-    std::string get() const throw() { return a; }
-
-private:
-    std::string a;
-
-    void print( std::string msg ) throw() { std::cout << msg; }
-};
-
-class Printable
-{
-public:
-    virtual std::string print() = 0;
-};
-
-class Person : public Printable
-{
-public:
-    Person() {}
-    Person( std::string n ) { name = n; }
-
-    std::string print() { return std::string( "Person name: " ) + name + "\n"; }
-private:
-    std::string name;
-};
-
-class Car : public Printable
-{
-public:
-    Car() {}
-    Car( std::string m ) { model = m; }
-
-    std::string print() { return std::string( "Car model: " ) + model + "\n"; }
-private:
-    std::string model;
-};
+template<class Node>
+void performTwoArrayTest
+    ( vox::Voxelizer<Node> & voxelizer
+    , const boost::program_options::variables_map & vm
+    );
 
 int main(int argc, char** argv)
 {
@@ -234,6 +168,8 @@ int main(int argc, char** argv)
         , "Prints detailed information about the voxelization." )
         ( "surface,u"
         , "Only renders the surface of the voxelization." )
+        ( "twoarrays,2"
+        , "Voxelize with two arrays: Surface and Volume nodes." )
         ( "filename"
         , boost::program_options::value<std::string>()->required()
         , "File to be voxelized." )
@@ -396,7 +332,14 @@ int main(int argc, char** argv)
         std::cout << "Invalid model data given" << std::endl;
         return 1;
     }
+    else if ( vm.count( "twoarrays" ) )
+    {
+        std::cout << "Starting tests with vox::VolumeNode and "
+            "vox::SurfaceNode @ " << sizeof(vox::VolumeNode) << " and " << 
+            sizeof(vox::SurfaceNode) << " bytes per node.\n";
 
+        initTests<vox::VolumeNode>( vm, polys );
+    }
     else if ( vm.count( "long" ) )
     {
         if ( vm.count( "fcc" ) )
@@ -1516,11 +1459,15 @@ void initTests
         nrOfUniqueMaterials = 0;
 
     auto modelData = loadModel( polys, nrOfVertices, nrOfTriangles );
+
+    std::cout << "Entering constructor.\n";
     
     vox::Voxelizer<Node> voxelizer( modelData.first.get()
                                   , modelData.second.get()
                                   , nrOfVertices
                                   , nrOfTriangles );
+
+    std::cout << "Exited constructor.\n";
 
     if ( vm.count( "verbose" ) )
         voxelizer.verboseOutput( true );
@@ -1541,7 +1488,11 @@ void initTests
         voxelizer.setMaterialOutput( true );
     }
 
-    if ( vm.count( "voxels" ) )
+    if ( vm.count( "twoarrays" ) )
+    {
+        performTwoArrayTest( voxelizer, vm );
+    }
+    else if ( vm.count( "voxels" ) )
     {
         performPlainVoxelTest( voxelizer, vm );
     }
@@ -1791,6 +1742,112 @@ void performNodeTest
     if ( vm.count( "materials" ) )
     {
         uint badNodes = numberOfNodesWithNoMaterial( nodes.get(), res );
+        std::cout << "Found " << badNodes << " boundary nodes with no material"
+            "\n";
+    }
+}
+
+template<class Node>
+void performTwoArrayTest
+    ( vox::Voxelizer<Node> & voxelizer
+    , const boost::program_options::variables_map & vm
+    )
+{
+    std::cout << "Entered performTwoArrayTest.\n";
+
+    std::vector<vox::Node2APointer<Node, vox::SurfaceNode> > result;
+
+    uint3 voxSplitRes = { 1024, 512, 512 };
+    if ( vm.count( "voxRes" ) )
+    {
+        auto newVoxSplitRes = vm[ "voxRes" ].as<std::vector<uint> >();
+        voxSplitRes.x = newVoxSplitRes.at(0);
+        voxSplitRes.y = newVoxSplitRes.at(1);
+        voxSplitRes.z = newVoxSplitRes.at(2);
+    }
+    uint3 matSplitRes = { 1024, 512, 512 };
+    if ( vm.count( "matRes" ) )
+    {
+        auto newMatSplitRes = vm[ "matRes" ].as<std::vector<uint> >();
+        matSplitRes.x = newMatSplitRes.at(0);
+        matSplitRes.y = newMatSplitRes.at(1);
+        matSplitRes.z = newMatSplitRes.at(2);
+    }
+
+    uint2 devConf = { 1, 1 };
+
+    if ( vm.count( "resolution" ) )
+    {
+        auto resolution = vm[ "resolution" ].as<uint>();
+
+        if ( vm.count( "multiDevice" ) )
+        {
+            auto dc = vm[ "multiDevice" ].as<std::vector<uint> >();
+            devConf.x = dc[0];
+            devConf.y = dc[1];
+            /*
+            result = voxelizer.simulateMultidevice( 
+                [&] () { return voxelizer.voxelizeToSurfaceNodes
+                                    ( resolution
+                                    , devConf
+                                    , voxSplitRes
+                                    , matSplitRes ); 
+                } );
+            */
+        }
+        else
+            result.push_back( voxelizer.voxelizeToSurfaceNodesToRAM
+                                        ( resolution
+                                        , voxSplitRes
+                                        , matSplitRes ) );
+    }
+    else if ( vm.count( "distance" ) )
+    {
+        auto distance = vm[ "distance" ].as<double>();
+
+        if ( vm.count( "multiDevice" ) )
+        {
+            auto dc = vm[ "multiDevice" ].as<std::vector<uint> >();
+            devConf.x = dc[0];
+            devConf.y = dc[1];
+
+            /*
+            result = voxelizer.simulateMultidevice( 
+                [&] () { return voxelizer.voxelizeToSurfaceNodes
+                                            ( distance
+                                            , devConf
+                                            , voxSplitRes
+                                            , matSplitRes ); 
+                } );
+            */
+        }
+        else
+            result.push_back( voxelizer.voxelizeToSurfaceNodesToRAM
+                                        ( distance
+                                        , voxSplitRes
+                                        , matSplitRes ) );
+    }
+
+    bool renderSurfaceOnly = vm.count( "surface" ) > 0;
+    bool renderMaterials = vm.count( "materials" ) > 0;
+
+    /*
+    uint3 res = vm.count( "multiDevice" ) ? fetchResolution( result, devConf )
+                                          : result[0].dim;
+    auto nodes = std::unique_ptr<Node>( 
+        vm.count( "multiDevice" ) ? stitchNodeArrays( result, devConf ) 
+                                  : result[0].nodes );
+    */
+
+    renderNodeOutput( result[0].nodes
+                    , renderSurfaceOnly
+                    , renderMaterials
+                    , result[0].dim );
+
+    if ( vm.count( "materials" ) )
+    {
+        uint badNodes = numberOfNodesWithNoMaterial( result[0].nodes
+                                                   , result[0].dim );
         std::cout << "Found " << badNodes << " boundary nodes with no material"
             "\n";
     }

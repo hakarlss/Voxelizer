@@ -1110,19 +1110,21 @@ void Voxelizer<Node, SNode>::voxelizeWorker(
             ; i < splits.counts.x * splits.counts.y * splits.counts.z
             ; ++i )
         {
-            calcOptSurfaceVoxelization( device.data
-                                      , this->hostVars
-                                      , device.vertices_gpu.get()
-                                      , device.indices_gpu.get()
-                                      , device.triangleTypes_gpu.get()
-                                      , device.sortedTriangles_gpu.get()
-                                      , device.materials_gpu.get()
-                                      , device.nodes_gpu.get()
-                                      , splits.splits[i]
-                                      , 1
-                                      , false
-                                      , this->startTime
-                                      , this->options.verbose );
+            calcOptSurfaceVoxelization<Node, SNode>
+                ( device.data
+                , this->hostVars
+                , device.vertices_gpu.get()
+                , device.indices_gpu.get()
+                , device.triangleTypes_gpu.get()
+                , device.sortedTriangles_gpu.get()
+                , device.materials_gpu.get()
+                , device.nodes_gpu.get()
+                , splits.splits[i]
+                , 1
+                , false
+                , device.surfNodes_gpu.get()
+                , this->startTime
+                , this->options.verbose );
 
             // Because pending kernel calls execute so quickly after another, 
             // the device driver times out even though individual calls return 
@@ -1194,6 +1196,7 @@ void Voxelizer<Node, SNode>::voxelizeWorker(
                         , allocYzSplits.splits[i]
                         , this->options.slices && 
                           this->options.sliceDirection == 0
+                        , device.surfNodes_gpu.get()
                         , this->startTime 
                         , this->options.verbose );
 
@@ -1561,20 +1564,22 @@ void Voxelizer<Node, SNode>::fccWorker(
                 ; i < splits.counts.x * splits.counts.y * splits.counts.z
                 ; ++i )
             {
-                calcOptSurfaceVoxelization( device.data
-                                          , this->hostVars
-                                          , device.vertices_gpu.get()
-                                          , device.indices_gpu.get()
-                                          , device.triangleTypes_gpu.get()
-                                          , device.sortedTriangles_gpu.get()
-                                          , device.materials_gpu.get()
-                                          , device.nodes_gpu.get()
-                                          , splits.splits[i]
-                                          , xSlicing ? (gridType + 1) % 4 + 1
-                                                     : gridType
-                                          , false
-                                          , this->startTime
-                                          , this->options.verbose );
+                calcOptSurfaceVoxelization<Node, SNode>
+                    ( device.data
+                    , this->hostVars
+                    , device.vertices_gpu.get()
+                    , device.indices_gpu.get()
+                    , device.triangleTypes_gpu.get()
+                    , device.sortedTriangles_gpu.get()
+                    , device.materials_gpu.get()
+                    , device.nodes_gpu.get()
+                    , splits.splits[i]
+                    , xSlicing ? (gridType + 1) % 4 + 1
+                               : gridType
+                    , false
+                    , device.surfNodes_gpu.get()
+                    , this->startTime
+                    , this->options.verbose );
 
                 // Because pending kernel calls execute so quickly after 
                 // another, the device driver times out even though individual 
@@ -1705,6 +1710,7 @@ void Voxelizer<Node, SNode>::twoNodeArraysWorker(
     uint3 matSplitRes,
     DevContext<Node,SNode> & device )
 {
+    std::cout << "Entered twoNodeArraysWorker\n";
     // All processing in this thread will use this device.
     cudaSetDevice( device.data.dev );
 
@@ -1902,19 +1908,21 @@ void Voxelizer<Node, SNode>::twoNodeArraysWorker(
             ; i < splits.counts.x * splits.counts.y * splits.counts.z
             ; ++i )
         {
-            calcOptSurfaceVoxelization( device.data
-                                      , this->hostVars
-                                      , device.vertices_gpu.get()
-                                      , device.indices_gpu.get()
-                                      , device.triangleTypes_gpu.get()
-                                      , device.sortedTriangles_gpu.get()
-                                      , device.materials_gpu.get()
-                                      , device.nodes_gpu.get()
-                                      , splits.splits[i]
-                                      , 1
-                                      , true
-                                      , this->startTime
-                                      , this->options.verbose );
+            calcOptSurfaceVoxelization<Node, SNode>
+                ( device.data
+                , this->hostVars
+                , device.vertices_gpu.get()
+                , device.indices_gpu.get()
+                , device.triangleTypes_gpu.get()
+                , device.sortedTriangles_gpu.get()
+                , device.materials_gpu.get()
+                , device.nodes_gpu.get()
+                , splits.splits[i]
+                , 1
+                , true
+                , device.surfNodes_gpu.get()
+                , this->startTime
+                , this->options.verbose );
 
             // Because pending kernel calls execute so quickly after another, 
             // the device driver times out even though individual calls return 
@@ -1934,6 +1942,8 @@ void Voxelizer<Node, SNode>::twoNodeArraysWorker(
                      , this->startTime
                      , this->options.verbose );
 
+    std::cout << "Number of surface nodes: " << device.data.nrOfSurfaceNodes << "\n";
+
     // Allocate Surface node array and HashMap.
 
     device.hashMap = HashMap( device.data.nrOfSurfaceNodes );
@@ -1947,6 +1957,8 @@ void Voxelizer<Node, SNode>::twoNodeArraysWorker(
                    , device.hashMap
                    , this->startTime
                    , this->options.verbose );
+
+    return;
 
     // Perform a simple translation from the integer representation to a Node 
     // representation. No materials or neighborhoods are calculated yet.
@@ -1974,19 +1986,21 @@ void Voxelizer<Node, SNode>::twoNodeArraysWorker(
             ; i < splits.counts.x * splits.counts.y * splits.counts.z
             ; ++i )
         {
-            calcOptSurfaceVoxelization( device.data
-                                      , this->hostVars
-                                      , device.vertices_gpu.get()
-                                      , device.indices_gpu.get()
-                                      , device.triangleTypes_gpu.get()
-                                      , device.sortedTriangles_gpu.get()
-                                      , device.materials_gpu.get()
-                                      , device.nodes_gpu.get()
-                                      , splits.splits[i]
-                                      , 1
-                                      , false
-                                      , this->startTime
-                                      , this->options.verbose );
+            calcOptSurfaceVoxelization<Node, SNode>
+                ( device.data
+                , this->hostVars
+                , device.vertices_gpu.get()
+                , device.indices_gpu.get()
+                , device.triangleTypes_gpu.get()
+                , device.sortedTriangles_gpu.get()
+                , device.materials_gpu.get()
+                , device.nodes_gpu.get()
+                , splits.splits[i]
+                , 1
+                , false
+                , device.surfNodes_gpu.get()
+                , this->startTime
+                , this->options.verbose );
 
             // Because pending kernel calls execute so quickly after another, 
             // the device driver times out even though individual calls return 
@@ -2001,19 +2015,10 @@ void Voxelizer<Node, SNode>::twoNodeArraysWorker(
         }
     }
 
-    // TODO: 1. Custom surface voxelization.
-    //       2. Custom node validator.
-    //       3. Testing of all the features.
+    // TODO: Testing of all the features.
     //
-    // 1: Only the processVoxel-function needs to be specialized for the 
-    //    new node types. Changes may have to be made in order to get the 
-    //    hash map and surface node array into the kernel, but other than that 
-    //    all that is needed is a copy & paste of the cutting algorithm and 
-    //    filling in the data in the data structures.
-    //
-    // 2: The original algorithm is fine, but now there is a hash map and 
-    //    surface node array to deal with. The data just goes has to go through 
-    //    a few additional hoops to get to where it needs to go.
+    // Test plan: Each subcomponent should be tested separately to ensure that 
+    //            there are no surprises later on.
     
     // If slicing along the x-direction, undo the rotation of the model.
     if ( this->options.slices && this->options.sliceDirection == 0 ) {
@@ -2072,6 +2077,7 @@ void Voxelizer<Node, SNode>::twoNodeArraysWorker(
                         , allocYzSplits.splits[i]
                         , this->options.slices && 
                           this->options.sliceDirection == 0
+                        , device.surfNodes_gpu.get()
                         , this->startTime 
                         , this->options.verbose );
 
@@ -3966,6 +3972,22 @@ std::vector<NodePointer<Node> > Voxelizer<Node, SNode>::collectData()
 
     return result;
 }
+
+template <class Node, class SNode>
+std::vector<Node2APointer<Node, SNode> > 
+    Voxelizer<Node, SNode>::collectSurfData()
+{
+    std::vector<Node2APointer<Node, SNode> > result;
+
+    const bool uploadToHost = this->options.simulateMultidevice;
+
+    for ( int i = 0; i < this->nrOfDevicesInUse; ++i )
+        result.push_back( this->collectSurfData( this->devices[i]
+                                               , uploadToHost
+                                               ) );
+
+    return result;
+}
 ///////////////////////////////////////////////////////////////////////////////
 /// Takes into account the unique characteristics of every different output 
 /// type. Usually called by collectData(vector<NodePointer>) as it cycles 
@@ -4047,6 +4069,58 @@ NodePointer<Node> Voxelizer<Node, SNode>::collectData
     return result;
 }
 
+template <class Node, class SNode>
+Node2APointer<Node, SNode> Voxelizer<Node, SNode>::collectSurfData
+    ( DevContext<Node,SNode> & device
+    , const bool         hostPointers
+    )
+{
+    Node2APointer<Node, SNode> result = Node2APointer<Node, SNode>();
+
+    // Dimensions of the output grid.
+    const uint3 res = device.data.allocResolution.max - 
+                      device.data.allocResolution.min;
+
+    result.dev = device.data.dev;
+    result.dim = res;
+    result.loc = device.data.location;
+    result.nrOfSurfNodes = device.data.nrOfSurfaceNodes;
+    result.indices = device.data.hashMap;
+
+    if ( hostPointers )
+    {   // Ouputting host pointers instead of device pointers.
+        result.nodes = new Node[ device.nodes_gpu.size() ];
+        result.surfNodes = new SNode[ device.surfNodes_gpu.size() ];
+
+        cudaSetDevice( result.dev );
+
+        if ( this->options.slices && this->options.sliceDirection == 0 )
+        {   // Slicing along the x-axis: Read from the Node array copy.
+            device.nodesCopy_gpu.copyTo( result.nodes );
+        }
+        else
+        {   // Usually just read from the standard location.
+            device.nodes_gpu.copyTo( result.nodes );
+            device.surfNodes_gpu.copyTo( result.surfNodes );
+        }
+
+    }
+    else
+    {   // Outputting device pointers instead of host pointers.
+        if ( this->options.slices && this->options.sliceDirection == 0 )
+        {   // Slicing along the x-axis: Read from the Node array copy.
+            result.nodes = device.nodesCopy_gpu.release();
+        }
+        else
+        {   // Usually just read from the standard location.
+            result.nodes = device.nodes_gpu.release();
+            result.surfNodes = device.surfNodes_gpu.release();
+        }
+    }
+
+    return result;
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 /// Sets the simulateMultiDevice variable to \p true before calling the 
 /// provided function and returning its result. This function is really only 
@@ -4100,7 +4174,7 @@ std::vector<Node2APointer<Node, SNode> >
 
     this->voxelizeEntry( devConfig, voxSplitRes, matSplitRes, NULL );
 
-    //result = this->collectData();
+    result = this->collectSurfData();
 
     this->deallocate();
 
@@ -4126,7 +4200,7 @@ std::vector<Node2APointer<Node, SNode> >
 
     this->voxelizeEntry( devConfig, voxSplitRes, matSplitRes, NULL );
 
-    //result = this->collectData();
+    result = this->collectSurfData();
 
     this->deallocate();
 
@@ -4151,7 +4225,7 @@ Node2APointer<Node, SNode>
 
     this->voxelizeEntry( make_uint2( 1, 1 ), voxSplitRes, matSplitRes, NULL );
 
-    //result = this->collectData( this->devices[0], true );
+    result = this->collectSurfData( this->devices[0], true );
 
     this->deallocate();
 
@@ -4175,7 +4249,7 @@ Node2APointer<Node, SNode>
 
     this->voxelizeEntry( make_uint2( 1, 1 ), voxSplitRes, matSplitRes, NULL );
 
-    //result = this->collectData( this->devices[0], true );
+    result = this->collectSurfData( this->devices[0], true );
 
     this->deallocate();
 

@@ -73,11 +73,13 @@ __global__ void unRotateNodes( Node *        inputNodes
                              , Bounds<uint3> resolution
                              , Bounds<uint2> yzSubSpace );
 /// Kernel that calculates the boundary ids of each node.
-template <class Node>
+template <class Node, class SNode>
 __global__ void fillNodeList2( Node       * nodes,
                       Bounds<uint3>         resolution, 
                       Bounds<uint2>         yzSubSpace,
-                               bool       * error );
+                               bool       * error,
+                            HashMap         hashMap,
+                              SNode       * surfNodes );
 /// Kernel that calculates the boundary ids of each FFC node.
 template <class Node>
 __global__ void calculateFCCBoundaries( Node * nodes
@@ -101,7 +103,7 @@ __global__ void classifyTriangles(float const * vertices,
                                  float3		    modelBBMin,
                                   float		    voxelLength );
 /// Kernel that surface voxelizes triangles with a 1D bounding box.
-template <class Node>
+template <class Node, class SNode>
 __global__ void process1DTriangles(float const * vertices, 
                                     uint const * indices, 
                                     uint const * triTypes,
@@ -119,9 +121,11 @@ __global__ void process1DTriangles(float const * vertices,
                            Bounds<uint3>	     totalResolution,
                            Bounds<uint3>         subSpace,
                                      int         gridType,
-                                    bool         countVoxels );
+                                    bool         countVoxels,
+                                 HashMap         hashMap,
+                                   SNode       * surfNodes );
 /// Kernel that surface voxelizes triangles with a 2D bounding box.
-template <class Node>
+template <class Node, class SNode>
 __global__ void process2DTriangles(float const * vertices, 
                                     uint const * indices,
                                     uint const * triTypes,
@@ -139,9 +143,11 @@ __global__ void process2DTriangles(float const * vertices,
                            Bounds<uint3>	     totalResolution,
                            Bounds<uint3>         subSpace,
                                      int         gridType,
-                                    bool         countVoxels );
+                                    bool         countVoxels,
+                                 HashMap         hashMap,
+                                   SNode       * surfNodes );
 /// Kernel that surface voxelizes triangles with a 3D bounding box.
-template <class Node>
+template <class Node, class SNode>
 __global__ void process3DTriangles(float const * vertices, 
                                     uint const * indices, 
                                     uint const * triTypes,
@@ -159,7 +165,9 @@ __global__ void process3DTriangles(float const * vertices,
                            Bounds<uint3>	     totalResolution,
                            Bounds<uint3>         subSpace,
                                      int         gridType,
-                                    bool         countVoxels );
+                                    bool         countVoxels,
+                                 HashMap         hashMap,
+                                   SNode       * surfNodes );
 /// Kernel that makes the outermost Nodes zero.
 template <class Node>
 __global__ void zeroPadding( Node  * nodes,
@@ -315,7 +323,7 @@ inline __host__ __device__
 inline __host__ __device__ 
     bool overlapTestXY( OverlapData data, float3 p );
 /// Writes the voxel to memory once an overlap has been confirmed.
-template <class Node> __device__ 
+template <class Node, class SNode> __device__ 
     void processVoxel( Node * nodes
                      , uchar const * materials
                      , uint triangleIdx
@@ -329,23 +337,9 @@ template <class Node> __device__
                      , int gridType
                      , uint3 resolution
                      , bool countVoxels
+                     , HashMap & hashMap
+                     , SNode * surfNodes
                      );
-/// Writes a PartialNode to memory.
-template <> __device__ 
-    void processVoxel<PartialNode>( PartialNode * nodes
-                                  , uchar const * materials
-                                  , uint triangleIdx
-                                  , float3 * triangle
-                                  , float3 triNormal
-                                  , float3 modelBBMin
-                                  , float voxelLength
-                                  , int x
-                                  , int y
-                                  , int z
-                                  , int gridType
-                                  , uint3 resolution
-                                  , bool countVoxels
-                                  );
 /// Determines the type of a triangle's bounding box.
 inline __host__ __device__ 
     const TriData analyzeBoundingBox( Bounds<float3> triBB
@@ -469,6 +463,64 @@ inline __host__ __device__
                             , int nrF3
                             , float3 triNormal
                             );
+
+__device__ float calculateCutVolumeAndAreas
+    ( float3 * triangle
+    , int3 voxel
+    , float3 triNormal
+    , float3 modelBBMin
+    , float d
+    , float & ipArea
+    , float & f1Area
+    , float & f2Area
+    , float & f3Area
+    , float & f4Area
+    , float & f5Area
+    , float & f6Area
+    );
+
+__device__ void constructAllPolyhedronFaces
+    ( float3 * vertices
+    , char      * indices
+    , char      & nrOfIPts  
+    , char      & nrF1    
+    , char      & nrF2   
+    , char      & nrF3   
+    , char      & nrF4    
+    , char      & nrF5    
+    , char      & nrF6     
+    , float3 * triangle  
+    , float3   triNormal 
+    );
+
+__device__ float polyhedronVolume
+    ( float3 * vertices
+    , char   * indices
+    , char     nrOfIPts  
+    , char     nrF1  
+    , char     nrF2  
+    , char     nrF3   
+    , float3   triNormal
+    , float3 & dx
+    , float3 & dy
+    , float3 & dz
+    , float  & ipArea
+    , float  & f1Area
+    , float  & f2Area
+    , float  & f3Area
+    );
+
+__device__ float pyramidVolume
+    ( float3 * base 
+    , int nrOfVerts    
+    , float3 height
+    , float & baseArea
+    );
+
+__device__ float polygonArea
+    ( float3 * base
+    , int nrOfVerts
+    );
 
 template <class Node>
 void dummyFunction();

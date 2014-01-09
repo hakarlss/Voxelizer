@@ -36,6 +36,9 @@ public:
     ///////////////////////////////////////////////////////////////////////////
     __host__ __device__ 
     ShortNode( uchar _bid, uchar _mat ) { set( _mat, _bid ); }
+
+    __host__ __device__
+    ShortNode( uchar _bid, uchar _mat, float _r ) { set( _mat, _bid); }
     ///////////////////////////////////////////////////////////////////////////
     /// \brief Extracts the <em>material id</em> from the \p bim.
     /// 
@@ -178,6 +181,9 @@ public:
     /// \param[in] mat <em>Material id</em>.
     ///////////////////////////////////////////////////////////////////////////
     __host__ __device__ LongNode(uchar bid, uchar mat): _bid(bid), _mat(mat) {}
+
+    __host__ __device__ 
+    LongNode(uchar bid, uchar mat, float r): _bid(bid), _mat(mat) {}
     ///////////////////////////////////////////////////////////////////////////
     /// \brief Getter method for the <em>material id</em>.
     /// 
@@ -481,6 +487,9 @@ public:
     ///////////////////////////////////////////////////////////////////////////
     __host__ __device__ 
     ShortFCCNode( ushort bid, ushort mat ) { set( mat, bid ); }
+
+    __host__ __device__ 
+    ShortFCCNode( ushort bid, ushort mat, float r ) { set( mat, bid ); }
     ///////////////////////////////////////////////////////////////////////////
     /// \brief Extracts the <em>material id</em> from the \p bim.
     /// 
@@ -647,6 +656,9 @@ public:
     ///////////////////////////////////////////////////////////////////////////
     __host__ __device__ 
     LongFCCNode( ushort bid, uchar mat ): _bid(bid), _mat(mat) {}
+
+    __host__ __device__ 
+    LongFCCNode( ushort bid, uchar mat, float r ): _bid(bid), _mat(mat) {}
     ///////////////////////////////////////////////////////////////////////////
     /// \brief Returns the <em>material id</em>.
     /// 
@@ -747,16 +759,17 @@ public:
     __host__ __device__ VolumeNode(): _bid(0) {}
     __host__ __device__ VolumeNode( char type ): _bid(type) {}
     __host__ __device__ VolumeNode( char type, char mat ): _bid(type) {}
+    __host__ __device__ VolumeNode( char type, char mat, float r ): _bid(type) {}
     __host__ __device__ ~VolumeNode() {}
 
     char _bid;
 
-    __host__ __device__ char mat() { return 0; }
-    __host__ __device__ char bid() { return _bid; }
-    __host__ __device__ float r() { return 0.0f; }
+    __host__ __device__ char mat() const { return 0; }
+    __host__ __device__ char bid() const { return _bid; }
+    __host__ __device__ float r() const { return 0.0f; }
 
     __host__ __device__ void mat( char m ) {}
-    __host__ __device__ void bid( char b ) {}
+    __host__ __device__ void bid( char b ) { _bid = b; }
     __host__ __device__ void r( float r ) {}
 
     ///////////////////////////////////////////////////////////////////////////
@@ -767,7 +780,8 @@ public:
     ///////////////////////////////////////////////////////////////////////////
     static __host__ __device__ bool usesTwoArrays() { return true; }
     static __host__ __device__ bool isFCCNode() { return false; }
-    static __host__ __device__ uchar maxMat() { return 0; }
+    static __host__ __device__ bool hasRatio() { return true; }
+    static __host__ __device__ uchar maxMat() { return 255; }
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -779,16 +793,17 @@ public:
     __host__ __device__ VolumeMapNode(): _bid(0) {}
     __host__ __device__ VolumeMapNode( uint32_t i ): _bid(i) {}
     __host__ __device__ VolumeMapNode( uint32_t type, char mat ): _bid(type) {}
+    __host__ __device__ VolumeMapNode( uint32_t type, char mat, float r ): _bid(type) {}
     __host__ __device__ ~VolumeMapNode() {}
 
     uint32_t _bid;
 
-    __host__ __device__ uint32_t mat() { return 0; }
-    __host__ __device__ uint32_t bid() { return _bid; }
-    __host__ __device__ float r() { return 0.0f; }
+    __host__ __device__ uint32_t mat() const { return 0; }
+    __host__ __device__ uint32_t bid() const { return _bid; }
+    __host__ __device__ float r() const { return 0.0f; }
 
     __host__ __device__ void mat( uint32_t m ) {}
-    __host__ __device__ void bid( uint32_t b ) {}
+    __host__ __device__ void bid( uint32_t b ) { _bid = b; }
     __host__ __device__ void r( float r ) {}
 
     ///////////////////////////////////////////////////////////////////////////
@@ -799,7 +814,8 @@ public:
     ///////////////////////////////////////////////////////////////////////////
     static __host__ __device__ bool usesTwoArrays() { return true; }
     static __host__ __device__ bool isFCCNode() { return false; }
-    static __host__ __device__ uchar maxMat() { return 0; }
+    static __host__ __device__ bool hasRatio() { return true; }
+    static __host__ __device__ uchar maxMat() { return 255; }
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -808,11 +824,21 @@ public:
 class SurfaceNode
 {
 public:
-    SurfaceNode(): orientation(0), material(0), volume(0.0f), 
+    __host__ __device__ SurfaceNode(): orientation(0), material(0), 
+        volume(0.0f), cutNormal(make_float3(0.0f, 0.0f, 0.0f)), cutArea(0.0f), 
+        xPosArea(0.0f), xNegArea(0.0f), yPosArea(0.0f), yNegArea(0.0f), 
+        zPosArea(0.0f), zNegArea(0.0f), mergedNodes(UINT_MAX) {}
+    __host__ __device__ SurfaceNode( uint32_t type, char mat ): 
+        orientation(type), material(mat), volume(0.0f), 
         cutNormal(make_float3(0.0f, 0.0f, 0.0f)), cutArea(0.0f), 
         xPosArea(0.0f), xNegArea(0.0f), yPosArea(0.0f), yNegArea(0.0f), 
         zPosArea(0.0f), zNegArea(0.0f), mergedNodes(UINT_MAX) {}
-    ~SurfaceNode() {}
+    __host__ __device__ SurfaceNode( uint32_t type, char mat, float r ): 
+        orientation(type), material(mat), volume(0.0f), 
+        cutNormal(make_float3(0.0f, 0.0f, 0.0f)), cutArea(0.0f), 
+        xPosArea(0.0f), xNegArea(0.0f), yPosArea(0.0f), yNegArea(0.0f), 
+        zPosArea(0.0f), zNegArea(0.0f), mergedNodes(UINT_MAX) {}
+    __host__ __device__ ~SurfaceNode() {}
 
     ushort orientation;
     ushort material;
@@ -831,6 +857,14 @@ public:
 
     uint mergedNodes;
 
+    __host__ __device__ uint32_t mat() const { return 0; }
+    __host__ __device__ uint32_t bid() const { return orientation; }
+    __host__ __device__ float r() const { return 0.0f; }
+
+    __host__ __device__ void mat( uint32_t m ) {}
+    __host__ __device__ void bid( uint32_t b ) {}
+    __host__ __device__ void r( float r ) {}
+
     ///////////////////////////////////////////////////////////////////////////
     /// \brief Returns \p true if the \p Node is meant to be used in 
     ///        conjunction with another \p Node type for surface nodes.
@@ -838,6 +872,9 @@ public:
     /// \return \p true.
     ///////////////////////////////////////////////////////////////////////////
     static __host__ __device__ bool usesTwoArrays() { return true; }
+    static __host__ __device__ bool isFCCNode() { return false; }
+    static __host__ __device__ bool hasRatio() { return false; }
+    static __host__ __device__ uchar maxMat() { return 0; }
 };
 
 } // End namespace vox

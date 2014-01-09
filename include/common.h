@@ -18,6 +18,8 @@
 #include <exception>
 #include <string>
 
+#include <ctime>
+
 namespace vox
 {
 
@@ -174,7 +176,7 @@ struct neq_0
 {
     //neq_x( T value ): x(value) {}
 
-    __host__ __device__ bool operator()( T c ) { return c.bid() != 0; }
+    __host__ __device__ bool operator()( const T & c ) { return c.bid() != 0; }
 
     //T x;
 };
@@ -227,80 +229,8 @@ inline void checkCudaErrors( std::string loc )
     }
 }
 ///////////////////////////////////////////////////////////////////////////////
-/// \brief A container for variables that need to have their own versions for 
-///        each device.
+///
 ///////////////////////////////////////////////////////////////////////////////
-struct CommonDevData
-{
-    int dev;						///< Device number.
-    cudaDeviceProp devProps;		///< Device properties.
-    size_t freeMem;					///< Free memory.
-    size_t maxMem;					///< Maximum memory.
-    uint blocks;				    ///< Number of blocks.
-    uint threads;					///< Number of threads per block.
-
-    ///< \brief Minimum corner of the model's bounding box. 
-    ///<
-    ///< Matches exactly the voxelization space, meaning that there is no 
-    ///< padding or anything extra that won't make it to the final 
-    ///< voxelization.
-    ///<
-    double3		  minVertex;
-    ///< \brief Extended minimum corner of the model's bounding box. 
-    ///<
-    ///< If there is a neighboring subspace to the left or below, then this 
-    ///< differs from minVertex. The extension also happens during slicing.
-    ///<
-    double3       extMinVertex;
-    uint		  workQueueSize;            ///< Size of the work queue.
-    uint		  maxWorkQueueSize;         ///< \brief How much is allocated 
-                                            ///<        for the work queue.
-                                            ///<
-    /// Which triangle is the first to have non-zero overlapping tiles.
-    int			  firstTriangleWithTiles;
-    /// Essentially the size of the compacted tile list.
-    uint		  nrValidElements; 
-    /// Dimensions of the model's bounding box in voxels.
-    Bounds<uint3> resolution;
-    /// Dimensions of the extended bounding box in voxels.
-    Bounds<uint3> extResolution;
-    /// Dimensions of the array that stores the voxels. Includes padding.
-    Bounds<uint3> allocResolution;
-    /// Where a subspace is relative to the whole space.
-    uint3         location;
-    
-    bool          left;     ///< If there is a subspace to the left.
-    bool          right;    ///< If there is a subspace to the right.
-    bool          up;       ///< If there is a subspace above.
-    bool          down;     ///< If there is a subspace below.
-
-    uint nrOfNodes;
-    uint nrOfSurfaceNodes;
-};
-///////////////////////////////////////////////////////////////////////////////
-/// \brief A container for many variables that don't need their own versions 
-///        for each device.
-///////////////////////////////////////////////////////////////////////////////
-struct CommonHostData
-{
-    uint		  nrOfTriangles;        ///< Number of triangles.
-    uint		  nrOfVertices;         ///< Number of vertices.
-    uint		  nrOfUniqueMaterials;  ///< Number of different materials.
-    double3		  minVertex;            ///< Minimum bounding box corner.
-    double3		  maxVertex;            ///< Maximum bounding box corner.
-    double		  voxelLength;          ///< Distance between voxel centers.
-    Bounds<uint3> resolution;           ///< Dimensions of the voxelization.
-
-    // Surface voxelization data.
-
-    uint		  start1DTris;          ///< Index where 1D Triangles start.
-    uint		  end1DTris;            ///< Index where 1D Triangles end.
-    uint		  start2DTris;          ///< Index where 2D Triangles start.
-    uint		  end2DTris;            ///< Index where 2D Triangles end.
-    uint		  start3DTris;          ///< Index where 3D Triangles start.
-    uint		  end3DTris;            ///< Index where 3D Triangles end.
-};
-
 const uint primeList[204] = {
     970194959, 970194983, 970194989, 970195021, 970195073, 970195123, 
     970195133, 970195139, 970195147, 970195169, 970195183, 970195207, 
@@ -473,6 +403,82 @@ private:
     {
         return (id*p + attempt*attempt) % size;
     }
+};
+///////////////////////////////////////////////////////////////////////////////
+/// \brief A container for variables that need to have their own versions for 
+///        each device.
+///////////////////////////////////////////////////////////////////////////////
+struct CommonDevData
+{
+    int dev;						///< Device number.
+    cudaDeviceProp devProps;		///< Device properties.
+    size_t freeMem;					///< Free memory.
+    size_t maxMem;					///< Maximum memory.
+    uint blocks;				    ///< Number of blocks.
+    uint threads;					///< Number of threads per block.
+
+    ///< \brief Minimum corner of the model's bounding box. 
+    ///<
+    ///< Matches exactly the voxelization space, meaning that there is no 
+    ///< padding or anything extra that won't make it to the final 
+    ///< voxelization.
+    ///<
+    double3		  minVertex;
+    ///< \brief Extended minimum corner of the model's bounding box. 
+    ///<
+    ///< If there is a neighboring subspace to the left or below, then this 
+    ///< differs from minVertex. The extension also happens during slicing.
+    ///<
+    double3       extMinVertex;
+    uint		  workQueueSize;            ///< Size of the work queue.
+    uint		  maxWorkQueueSize;         ///< \brief How much is allocated 
+                                            ///<        for the work queue.
+                                            ///<
+    /// Which triangle is the first to have non-zero overlapping tiles.
+    int			  firstTriangleWithTiles;
+    /// Essentially the size of the compacted tile list.
+    uint		  nrValidElements; 
+    /// Dimensions of the model's bounding box in voxels.
+    Bounds<uint3> resolution;
+    /// Dimensions of the extended bounding box in voxels.
+    Bounds<uint3> extResolution;
+    /// Dimensions of the array that stores the voxels. Includes padding.
+    Bounds<uint3> allocResolution;
+    /// Where a subspace is relative to the whole space.
+    uint3         location;
+    
+    bool          left;     ///< If there is a subspace to the left.
+    bool          right;    ///< If there is a subspace to the right.
+    bool          up;       ///< If there is a subspace above.
+    bool          down;     ///< If there is a subspace below.
+
+    uint nrOfNodes;
+    uint nrOfSurfaceNodes;
+
+    HashMap hashMap;
+};
+///////////////////////////////////////////////////////////////////////////////
+/// \brief A container for many variables that don't need their own versions 
+///        for each device.
+///////////////////////////////////////////////////////////////////////////////
+struct CommonHostData
+{
+    uint		  nrOfTriangles;        ///< Number of triangles.
+    uint		  nrOfVertices;         ///< Number of vertices.
+    uint		  nrOfUniqueMaterials;  ///< Number of different materials.
+    double3		  minVertex;            ///< Minimum bounding box corner.
+    double3		  maxVertex;            ///< Maximum bounding box corner.
+    double		  voxelLength;          ///< Distance between voxel centers.
+    Bounds<uint3> resolution;           ///< Dimensions of the voxelization.
+
+    // Surface voxelization data.
+
+    uint		  start1DTris;          ///< Index where 1D Triangles start.
+    uint		  end1DTris;            ///< Index where 1D Triangles end.
+    uint		  start2DTris;          ///< Index where 2D Triangles start.
+    uint		  end2DTris;            ///< Index where 2D Triangles end.
+    uint		  start3DTris;          ///< Index where 3D Triangles start.
+    uint		  end3DTris;            ///< Index where 3D Triangles end.
 };
 
 } // End namespace vox
