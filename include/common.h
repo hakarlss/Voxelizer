@@ -17,6 +17,7 @@
 
 #include <exception>
 #include <string>
+#include <iostream>
 
 #include <ctime>
 
@@ -224,8 +225,10 @@ inline void checkCudaErrors( std::string loc )
 
     if ( e != cudaSuccess )
     {
-        std::string msg = cudaGetErrorString( e );
-        throw Exception( msg + " @ " + loc );
+        std::string errorString = cudaGetErrorString( e );
+        std::string msg = errorString + " @ " + loc;
+        std::cout << msg;
+        throw Exception( msg );
     }
 }
 ///////////////////////////////////////////////////////////////////////////////
@@ -359,7 +362,7 @@ public:
     void allocate()
     {
         cudaMalloc( &table, sizeof(uint64_t)*size );
-        cudaMemset( &table, UINT32_MAX, sizeof(uint64_t)*size );
+        cudaMemset( table, UINT32_MAX, sizeof(uint64_t)*size );
     }
 
     __host__
@@ -389,6 +392,15 @@ public:
         {
             table[i] = HashMap::EMPTY;
         }
+    }
+
+    __host__
+    void convertToHostMemory()
+    {
+        uint64_t * devPtr = table;
+        table = new uint64_t[size];
+        cudaMemcpy( table, devPtr, size * sizeof(uint64_t), cudaMemcpyDeviceToHost );
+        cudaFree( devPtr );
     }
 
     static const uint64_t EMPTY = UINT64_MAX;

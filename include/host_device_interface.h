@@ -163,9 +163,8 @@ void restoreRotatedNodes( CommonDevData const & devData,
 ///
 template <class Node>
 void populateHashMap
-    ( CommonDevData const & devData
+    ( CommonDevData       & devData
     , Node                * nodes_gpu
-    , HashMap             & hashMap
     , clock_t               startTime
     , bool                  verbose );
 

@@ -1946,19 +1946,17 @@ void Voxelizer<Node, SNode>::twoNodeArraysWorker(
 
     // Allocate Surface node array and HashMap.
 
-    device.hashMap = HashMap( device.data.nrOfSurfaceNodes );
-    device.hashMap.allocate();
+    device.data.hashMap = HashMap( 2 * device.data.nrOfSurfaceNodes );
+    device.data.hashMap.allocate();
+
     device.surfNodes_gpu.reset( device.data.nrOfSurfaceNodes
                               , device.data.dev );
-    device.surfNodes_gpu.setAllTo( UCHAR_MAX );
+    device.surfNodes_gpu.zero();
 
     populateHashMap( device.data
                    , device.nodes_gpu.get()
-                   , device.hashMap
                    , this->startTime
                    , this->options.verbose );
-
-    return;
 
     // Perform a simple translation from the integer representation to a Node 
     // representation. No materials or neighborhoods are calculated yet.
@@ -4086,6 +4084,7 @@ Node2APointer<Node, SNode> Voxelizer<Node, SNode>::collectSurfData
     result.loc = device.data.location;
     result.nrOfSurfNodes = device.data.nrOfSurfaceNodes;
     result.indices = device.data.hashMap;
+    result.indices.convertToHostMemory();
 
     if ( hostPointers )
     {   // Ouputting host pointers instead of device pointers.

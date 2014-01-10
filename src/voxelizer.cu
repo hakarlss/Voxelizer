@@ -693,7 +693,11 @@ void calcOptSurfaceVoxelization(
                                      countVoxels,
                                      devData.hashMap,
                                      surfNodes );
+
+        cudaDeviceSynchronize();
     }
+
+    checkCudaErrors( "process1DTriangles" );
 
     // Process and voxelize triangles with a 2-dimensional bounding box.
     if (hostData.start2DTris != hostData.end2DTris) 
@@ -726,7 +730,11 @@ void calcOptSurfaceVoxelization(
                                      countVoxels,
                                      devData.hashMap,
                                      surfNodes );
+
+        cudaDeviceSynchronize();
     }
+
+    checkCudaErrors( "process2DTriangles" );
 
     // Process and voxelize triangles with a 3-dimensional bounding box.
     if (hostData.start3DTris != hostData.end3DTris) 
@@ -759,6 +767,8 @@ void calcOptSurfaceVoxelization(
                                      countVoxels,
                                      devData.hashMap,
                                      surfNodes );
+
+        cudaDeviceSynchronize();
     }
 
     checkCudaErrors( "calcOptSurfaceVoxelization" );
@@ -847,9 +857,8 @@ void restoreRotatedNodes( CommonDevData const & devData,
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node>
 void populateHashMap
-    ( CommonDevData const & devData
+    ( CommonDevData       & devData
     , Node                * nodes_gpu
-    , HashMap             & hashMap
     , clock_t               startTime
     , bool                  verbose )
 {
@@ -861,13 +870,13 @@ void populateHashMap
 
     if (verbose) 
         std::cout << (clock() - startTime) << ": Calling populateHashMap"
-                     "<<<" << blocks << ", (32,32)\n";
+                     "<<<" << blocks << ", (32,32) >>>\n";
 
     uint3 dim = devData.allocResolution.max - devData.allocResolution.min;
     
     fillHashMap<Node>
         <<< blocks, threadsPerBlock >>>( nodes_gpu, 
-                                         hashMap,
+                                         devData.hashMap,
                                          dim );
 
     checkCudaErrors( "populateHashMap" );
@@ -5762,38 +5771,40 @@ __global__ void fillHashMap
     const uint threads = blockDim.x * blockDim.y;
     const uint maxN = maxNodeIdx + (threads - maxNodeIdx % threads);
 
-    index[threadIdx.x + 1] = 0;
+    index[threadIdx.y + 1] = 0;
     if ( threadIdx.x == 0 && threadIdx.y == 0 ) index[0] = 0;
 
-    bool running = true;
     for ( uint n = blockDim.x * threadIdx.y + threadIdx.x
         ; n < maxN
         ; n += blockDim.x * blockDim.y )
     {
         __syncthreads();
 
-        if ( n >= maxNodeIdx ) running = false;
-
         uint count = UINT_MAX;
 
-        if ( running )
+        if ( n < maxNodeIdx )
         {
             const uint nodeType = nodes[n].bid(); 
             const uint ballot = __ballot( nodeType );
 
-            if ( (1u << threadIdx.x & ballot) > 0 )
+            if ( ballot == 0u )
+            {
+                index[threadIdx.y + 1] = 0;
+            }
+            else if ( ((1u << threadIdx.x) & ballot) > 0 )
             {
                 bool last = true;
                 count = 0;
                 for ( int i = 0; i < 32; ++i )
                 {
-                    bool p = i > threadIdx.x;
-                    bool isect = (1u << i & ballot) > 0;
+                    const bool p = i > threadIdx.x;
+                    const bool isect = ((1u << i) & ballot) > 0;
                     count += isect ? !p : 0;
                     last = p && isect ? false : last;
                 }
 
                 if ( last ) index[threadIdx.y + 1] = count;
+                count -= 1;
             }
         }
 
@@ -5805,21 +5816,20 @@ __global__ void fillHashMap
             {
                 index[i+1] += index[i];
             }
-            index[0] += index[32];
         }
 
         __syncthreads();
 
         if ( count != UINT_MAX )
         {
-            map.insert( n, count - 1 + index[threadIdx.x] );
+            map.insert( n, count + index[threadIdx.y] );
         }
 
         __syncthreads();
 
         if ( threadIdx.x == 0 && threadIdx.y == 0 )
         {
-            index[0] += index[32];
+            index[0] = index[32];
         }
     }
 }
@@ -5867,7 +5877,7 @@ template <class Node, class SNode> void dummyFunction()
     makePaddingZero<Node>( dd, n, n, true, t, true );
     restoreRotatedNodes<Node>( dd, n, n, ui2b, t, true );
     calcSurfNodeCount<Node>( dd, n, t, true );
-    populateHashMap<Node>( dd, n, h, t, true );
+    populateHashMap<Node>( dd, n, t, true );
 }
 ///////////////////////////////////////////////////////////////////////////////
 /// \brief "Uses" functions with every \p Node type to force the compiler to 

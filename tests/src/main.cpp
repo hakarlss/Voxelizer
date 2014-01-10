@@ -1841,8 +1841,47 @@ void performTwoArrayTest
 
     renderNodeOutput( result[0].nodes
                     , renderSurfaceOnly
-                    , renderMaterials
+                    , false
                     , result[0].dim );
+
+    uint nrOfNodes = result[0].dim.x * result[0].dim.y * result[0].dim.z;
+
+    uint nrOfSurfaceNodes = 0;
+    uint nrOfMatches = 0;
+    uint prevIdx = UINT32_MAX;
+    for ( uint n = 0; n < nrOfNodes; ++n )
+    {
+        if ( result[0].nodes[n].bid() != 0 )
+        {
+            nrOfSurfaceNodes++;
+
+            uint i = result[0].indices.get(n);
+
+            if ( i == UINT32_MAX )
+                continue;
+
+            if ( prevIdx == UINT32_MAX )
+                prevIdx = i;
+            else
+            {
+                if ( prevIdx + 1 == i )
+                    prevIdx = i;
+            }
+
+            nrOfMatches++;
+
+            //vox::SurfaceNode sn = result[0].surfNodes[i];
+
+            //if ( sn.orientation == 0 )
+            //    nrOfMatches++;
+        }
+    }
+
+    std::cout << "\n\n";
+
+    std::cout << "Nr of surface nodes found: " << nrOfSurfaceNodes << "\n";
+    std::cout << "Nr of matching nodes found: " << nrOfMatches << "\n";
+    std::cout << "Largest continuous index: " << prevIdx << "\n";
 
     if ( vm.count( "materials" ) )
     {
