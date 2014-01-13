@@ -1995,8 +1995,6 @@ __global__ void fillNodeList2
 
         if ( Node::usesTwoArrays() )
         {
-            if ( !(newBid == 27 || newBid == 0) )
-            {
                 uint surfNodeIdx = hashMap.get( n );
                 if ( surfNodeIdx != UINT32_MAX )
                 {
@@ -2004,7 +2002,6 @@ __global__ void fillNodeList2
                     surfNode.orientation = newBid;
                     surfNodes[surfNodeIdx] = surfNode;
                 }
-            }
         }
         else
             nodes[n] = node;
@@ -3118,6 +3115,12 @@ inline __device__ void processVoxel
                                           , a4
                                           , a5
                                           , a6 );
+
+            n.volume = volume;
+
+            n.cutNormal = triNormal;
+            n.cutArea = a0;
+
             n.xPosArea = a1;
             n.xNegArea = a6;
 

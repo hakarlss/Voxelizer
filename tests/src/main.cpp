@@ -84,6 +84,13 @@ void renderSurfNodeOutput( Node * nodes
                          , bool materials
                          , uint3 res );
 
+template <class Node, class SNode>
+void analyzeSurfaceNodes( Node * nodes
+                        , SNode * surfNodes
+                        , vox::HashMap & hashMap
+                        , uint3 dim
+                        , uint nrOfSurfNodes );
+
 void testFunction();
 
 template <typename T>
@@ -1958,30 +1965,27 @@ void performTwoArrayTest
     uint prevIdx = UINT32_MAX;
     for ( uint n = 0; n < nrOfNodes; ++n )
     {
-        if ( result[0].nodes[n].bid() != 0 )
+        uint i = result[0].indices.get(n);
+
+        if ( i == UINT32_MAX )
+            continue;
+
+        nrOfSurfaceNodes++;
+
+        if ( prevIdx == UINT32_MAX )
+            prevIdx = i;
+        else
         {
-            nrOfSurfaceNodes++;
-
-            uint i = result[0].indices.get(n);
-
-            if ( i == UINT32_MAX )
-                continue;
-
-            if ( prevIdx == UINT32_MAX )
+            if ( prevIdx + 1 == i )
                 prevIdx = i;
-            else
-            {
-                if ( prevIdx + 1 == i )
-                    prevIdx = i;
-            }
-
-            nrOfMatches++;
-
-            //vox::SurfaceNode sn = result[0].surfNodes[i];
-
-            //if ( sn.orientation == 0 )
-            //    nrOfMatches++;
         }
+
+        nrOfMatches++;
+
+        //vox::SurfaceNode sn = result[0].surfNodes[i];
+
+        //if ( sn.orientation == 0 )
+        //    nrOfMatches++;
     }
 
     std::cout << "\n\n";
@@ -1999,6 +2003,12 @@ void performTwoArrayTest
             "\n";
     }
     */
+
+    analyzeSurfaceNodes( result[0].nodes
+                       , result[0].surfNodes
+                       , result[0].indices
+                       , result[0].dim
+                       , result[0].nrOfSurfNodes );
 }
 
 template<class Node>
@@ -2289,4 +2299,64 @@ void validate( std::string var
             std::exit( 1 );
         }
     }
+}
+
+template <class Node, class SNode>
+void analyzeSurfaceNodes( Node * nodes
+                        , SNode * surfNodes
+                        , vox::HashMap & hashMap
+                        , uint3 dim
+                        , uint nrOfSurfNodes )
+{
+    uint orientations[28] = {0};
+    uint nodesWithMaterials = 0;
+    uint nodesWithVolume = 0;
+    uint nodesWithAreas = 0;
+    uint accessibleSurfNodes = 0;
+    uint sameBids = 0;
+    for ( uint i = 0; i < nrOfSurfNodes; ++i )
+    {
+        SNode n = surfNodes[i];
+
+        orientations[n.orientation] += 1;
+
+        if ( n.material != 0 ) nodesWithMaterials++;
+        if ( n.volume != 0.0f ) nodesWithVolume++;
+        if ( n.xPosArea != 0.0f || n.xNegArea != 0.0f || 
+             n.yPosArea != 0.0f || n.yNegArea != 0.0f || 
+             n.zPosArea != 0.0f || n.zNegArea != 0.0f )
+        {
+            nodesWithAreas++;
+        }
+    }
+
+    uint nrOfNodes = dim.x * dim.y * dim.z;
+    for ( uint n = 0; n < nrOfNodes; ++n )
+    {
+        uint idx = hashMap.get(n);
+
+        if ( idx == UINT32_MAX )
+            continue;
+
+        accessibleSurfNodes++;
+
+        SNode sn = surfNodes[idx];
+
+        if ( sn.orientation == nodes[n].bid() )
+            sameBids++;
+
+
+    }
+
+    std::cout << "Orientation spread among surface nodes:\n";
+    for ( int i = 0; i < 10; ++i )
+        std::cout << "Orientation 0" << i << ": " << orientations[i] << "\n";
+    for ( int i = 10; i < 28; ++i )
+        std::cout << "Orientation " << i << ": " << orientations[i] << "\n";
+
+    std::cout << "Number of Surface nodes : " << nrOfSurfNodes << "\n";
+    std::cout << "Nodes with materials    : " << nodesWithMaterials << "\n";
+    std::cout << "Nodes with volume       : " << nodesWithVolume << "\n";
+    std::cout << "Nodes with areas        : " << nodesWithAreas << "\n";
+    std::cout << "Accessible nodes        : " << accessibleSurfNodes << "\n";
 }
