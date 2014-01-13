@@ -651,6 +651,7 @@ void renderSurfNodeOutput( Node * nodes
 
     for (uint nodeIdx = 0; nodeIdx < res.x * res.y * res.z; nodeIdx++)
     {
+        /*
         // Ignore non-solid nodes.
         if (nodes[nodeIdx].bid() == 0)
             continue;
@@ -658,6 +659,7 @@ void renderSurfNodeOutput( Node * nodes
         // Ignore air nodes.
         if (nodes[nodeIdx].bid() == 27)
             continue;
+        */
 
         uint surfNodeIdx = hashMap.get( nodeIdx );
 
@@ -673,7 +675,12 @@ void renderSurfNodeOutput( Node * nodes
                 continue;
         }
 
+        /*
         if ( surfNode.orientation == 0 || surfNode.orientation == 27 )
+            continue;
+        */
+
+        if ( surfNode.volume == 0.0f )
             continue;
 
         uint x = nodeIdx % res.x;
@@ -1955,7 +1962,7 @@ void performTwoArrayTest
     renderSurfNodeOutput( result[0].nodes
                         , result[0].surfNodes
                         , result[0].indices
-                        , true
+                        , false
                         , result[0].dim );
 
     uint nrOfNodes = result[0].dim.x * result[0].dim.y * result[0].dim.z;
@@ -2324,7 +2331,7 @@ void analyzeSurfaceNodes( Node * nodes
         if ( n.volume != 0.0f ) nodesWithVolume++;
         if ( n.xPosArea != 0.0f || n.xNegArea != 0.0f || 
              n.yPosArea != 0.0f || n.yNegArea != 0.0f || 
-             n.zPosArea != 0.0f || n.zNegArea != 0.0f )
+             n.zPosArea != 0.0f || n.zNegArea != 0.0f || n.cutArea != 0.0f )
         {
             nodesWithAreas++;
         }
@@ -2359,4 +2366,5 @@ void analyzeSurfaceNodes( Node * nodes
     std::cout << "Nodes with volume       : " << nodesWithVolume << "\n";
     std::cout << "Nodes with areas        : " << nodesWithAreas << "\n";
     std::cout << "Accessible nodes        : " << accessibleSurfNodes << "\n";
+    std::cout << "Nodes with same bid     : " << sameBids << "\n";
 }

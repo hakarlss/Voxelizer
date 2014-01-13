@@ -5162,6 +5162,25 @@ __device__ float calculateCutVolumeAndAreas
                                , triangle
                                , -triNormal );
 
+    if ( nrOfIntersectionPoints == 0 )
+    {
+        float dist = dot( triNormal, vertices[0] - triangle[0] );
+
+        bool v = dist <= 0.0f;
+
+        float maxArea = d * d;
+
+        ipArea = 0.0f;
+        f1Area = v ? maxArea : 0.0f;
+        f2Area = v ? maxArea : 0.0f;
+        f3Area = v ? maxArea : 0.0f;
+        f4Area = v ? maxArea : 0.0f;
+        f5Area = v ? maxArea : 0.0f;
+        f6Area = v ? maxArea : 0.0f;
+
+        return v ? maxArea * d : 0.0f;
+    }
+
     // Calculate area of face 4.
     float3 base[8];
     float3 height;
@@ -5319,6 +5338,7 @@ __device__ void constructAllPolyhedronFaces
                 dot( triNormal, vertices[7] - vertices[4] );
             if (t < 0.0f || t > 1.0f) // No intersection.
             {
+                /*
                 indices[ nrF1 ] = 7;
                 nrF1++;
                 indices[ 8*1 + nrF2 ] = 7;
@@ -5327,6 +5347,10 @@ __device__ void constructAllPolyhedronFaces
                 nrF3++;
                 indices[ 8*2 + nrF3 ] = 4;
                 nrF3++;
+                */
+
+                nrOfIPts = 0;
+                return;
             }
             else // Intersection in path 1, v4 -> v7.
             {
