@@ -76,6 +76,14 @@ void applySlice( Node * slice
                , uint direction );
 template <class NT>
 void renderFCCNodeOutput(NT* nodes, bool onlySurface, bool materials, uint3 res);
+
+template <class Node, class SNode>
+void renderSurfNodeOutput( Node * nodes
+                         , SNode * surfNodes
+                         , vox::HashMap & hashMap
+                         , bool materials
+                         , uint3 res );
+
 void testFunction();
 
 template <typename T>
@@ -570,6 +578,105 @@ void renderNodeOutput(NT* nodes, bool onlySurface, bool materials, uint3 res)
 
         if (materials)
             colors->InsertNextTupleValue(colorList[nodes[nodeIdx].mat()]);
+        else
+            colors->InsertNextTupleValue(white);
+    }
+
+    vtkSmartPointer<vtkPolyData> data = vtkSmartPointer<vtkPolyData>::New();
+    data->SetPoints(points);
+
+    vtkSmartPointer<vtkVertexGlyphFilter> vertexFilter = vtkSmartPointer<vtkVertexGlyphFilter>::New();
+    vertexFilter->SetInputConnection(data->GetProducerPort());
+    vertexFilter->Update();
+
+    vtkSmartPointer<vtkPolyData> polydata = vtkSmartPointer<vtkPolyData>::New();
+    polydata->ShallowCopy(vertexFilter->GetOutput());
+
+    polydata->GetPointData()->SetScalars(colors);
+
+    vtkSmartPointer<vtkPolyDataMapper> mapper = vtkSmartPointer<vtkPolyDataMapper>::New();
+    mapper->SetInput(polydata);
+
+    vtkSmartPointer<vtkActor> actor = vtkSmartPointer<vtkActor>::New();
+    actor->SetMapper(mapper);
+    actor->GetProperty()->SetPointSize(1);
+
+    vtkSmartPointer<vtkRenderer> renderer = vtkSmartPointer<vtkRenderer>::New();
+    vtkSmartPointer<vtkRenderWindow> renderWindow = vtkSmartPointer<vtkRenderWindow>::New();
+    renderWindow->AddRenderer(renderer);
+
+    vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor = vtkSmartPointer<vtkRenderWindowInteractor>::New();
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+
+    renderer->AddActor(actor);
+
+    renderWindow->Render();
+    renderWindowInteractor->Start();
+}
+
+template <class Node, class SNode>
+void renderSurfNodeOutput( Node * nodes
+                         , SNode * surfNodes
+                         , vox::HashMap & hashMap
+                         , bool materials
+                         , uint3 res )
+{
+    vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
+    vtkSmartPointer<vtkCellArray> cells = vtkSmartPointer<vtkCellArray>::New();
+
+    // Colors
+    unsigned char black[3] = { 0, 0, 0 };
+    unsigned char red[3] = { 255, 0, 0 };
+    unsigned char green[3] = { 0, 255, 0 };
+    unsigned char blue[3] = { 0, 0, 255 };
+    unsigned char yellow[3] = { 255, 255, 0 };
+    unsigned char purple[3] = { 255, 0, 255 };
+    unsigned char aquamarine[3] = { 0, 255, 255 };
+    unsigned char grey[3] = { 127, 127, 127 };
+
+    unsigned char white[3] = { 255, 255, 255 };
+
+    unsigned char * colorList[8] = { white, red, green, blue, yellow, purple, aquamarine, grey };
+
+    vtkSmartPointer<vtkUnsignedCharArray> colors = vtkSmartPointer<vtkUnsignedCharArray>::New();
+    colors->SetNumberOfComponents(3);
+    colors->SetName("Color");
+
+    for (uint nodeIdx = 0; nodeIdx < res.x * res.y * res.z; nodeIdx++)
+    {
+        // Ignore non-solid nodes.
+        if (nodes[nodeIdx].bid() == 0)
+            continue;
+
+        // Ignore air nodes.
+        if (nodes[nodeIdx].bid() == 27)
+            continue;
+
+        uint surfNodeIdx = hashMap.get( nodeIdx );
+
+        if ( surfNodeIdx == UINT32_MAX )
+            continue;
+
+        SNode surfNode = surfNodes[surfNodeIdx];
+
+        if (materials)
+        {
+            // Ignore nodes with zero material.
+            if (surfNode.material == 0)
+                continue;
+        }
+
+        if ( surfNode.orientation == 0 || surfNode.orientation == 27 )
+            continue;
+
+        uint x = nodeIdx % res.x;
+        uint y = (nodeIdx % (res.x * res.y)) / res.x;
+        uint z = nodeIdx / (res.x * res.y);
+
+        points->InsertNextPoint(double(x), double(y), double(z));
+
+        if (materials)
+            colors->InsertNextTupleValue(colorList[surfNode.material]);
         else
             colors->InsertNextTupleValue(white);
     }
@@ -1828,7 +1935,6 @@ void performTwoArrayTest
                                         , matSplitRes ) );
     }
 
-    bool renderSurfaceOnly = vm.count( "surface" ) > 0;
     bool renderMaterials = vm.count( "materials" ) > 0;
 
     /*
@@ -1839,10 +1945,11 @@ void performTwoArrayTest
                                   : result[0].nodes );
     */
 
-    renderNodeOutput( result[0].nodes
-                    , renderSurfaceOnly
-                    , false
-                    , result[0].dim );
+    renderSurfNodeOutput( result[0].nodes
+                        , result[0].surfNodes
+                        , result[0].indices
+                        , true
+                        , result[0].dim );
 
     uint nrOfNodes = result[0].dim.x * result[0].dim.y * result[0].dim.z;
 
@@ -1883,6 +1990,7 @@ void performTwoArrayTest
     std::cout << "Nr of matching nodes found: " << nrOfMatches << "\n";
     std::cout << "Largest continuous index: " << prevIdx << "\n";
 
+    /*
     if ( vm.count( "materials" ) )
     {
         uint badNodes = numberOfNodesWithNoMaterial( result[0].nodes
@@ -1890,6 +1998,7 @@ void performTwoArrayTest
         std::cout << "Found " << badNodes << " boundary nodes with no material"
             "\n";
     }
+    */
 }
 
 template<class Node>

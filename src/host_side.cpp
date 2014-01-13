@@ -4084,7 +4084,6 @@ Node2APointer<Node, SNode> Voxelizer<Node, SNode>::collectSurfData
     result.loc = device.data.location;
     result.nrOfSurfNodes = device.data.nrOfSurfaceNodes;
     result.indices = device.data.hashMap;
-    result.indices.convertToHostMemory();
 
     if ( hostPointers )
     {   // Ouputting host pointers instead of device pointers.
@@ -4101,6 +4100,7 @@ Node2APointer<Node, SNode> Voxelizer<Node, SNode>::collectSurfData
         {   // Usually just read from the standard location.
             device.nodes_gpu.copyTo( result.nodes );
             device.surfNodes_gpu.copyTo( result.surfNodes );
+            result.indices.convertToHostMemory();
         }
 
     }

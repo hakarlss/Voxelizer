@@ -827,17 +827,17 @@ public:
     __host__ __device__ SurfaceNode(): orientation(0), material(0), 
         volume(0.0f), cutNormal(make_float3(0.0f, 0.0f, 0.0f)), cutArea(0.0f), 
         xPosArea(0.0f), xNegArea(0.0f), yPosArea(0.0f), yNegArea(0.0f), 
-        zPosArea(0.0f), zNegArea(0.0f), mergedNodes(UINT_MAX) {}
+        zPosArea(0.0f), zNegArea(0.0f)/*, mergedNodes(UINT_MAX)*/ {}
     __host__ __device__ SurfaceNode( uint32_t type, char mat ): 
         orientation(type), material(mat), volume(0.0f), 
         cutNormal(make_float3(0.0f, 0.0f, 0.0f)), cutArea(0.0f), 
         xPosArea(0.0f), xNegArea(0.0f), yPosArea(0.0f), yNegArea(0.0f), 
-        zPosArea(0.0f), zNegArea(0.0f), mergedNodes(UINT_MAX) {}
+        zPosArea(0.0f), zNegArea(0.0f)/*, mergedNodes(UINT_MAX)*/ {}
     __host__ __device__ SurfaceNode( uint32_t type, char mat, float r ): 
         orientation(type), material(mat), volume(0.0f), 
         cutNormal(make_float3(0.0f, 0.0f, 0.0f)), cutArea(0.0f), 
         xPosArea(0.0f), xNegArea(0.0f), yPosArea(0.0f), yNegArea(0.0f), 
-        zPosArea(0.0f), zNegArea(0.0f), mergedNodes(UINT_MAX) {}
+        zPosArea(0.0f), zNegArea(0.0f)/*, mergedNodes(UINT_MAX)*/ {}
     __host__ __device__ ~SurfaceNode() {}
 
     ushort orientation;
@@ -855,7 +855,7 @@ public:
     float zPosArea;
     float zNegArea;
 
-    uint mergedNodes;
+    //uint mergedNodes;
 
     __host__ __device__ uint32_t mat() const { return 0; }
     __host__ __device__ uint32_t bid() const { return orientation; }

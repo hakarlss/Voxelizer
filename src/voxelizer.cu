@@ -430,6 +430,8 @@ template <class Node, class SNode> void procNodeList(
                                          devData.hashMap,
                                          surfNodes );
 
+    cudaDeviceSynchronize();
+
     checkCudaErrors( "procNodeList" );
 }
 ///////////////////////////////////////////////////////////////////////////////
@@ -1993,12 +1995,15 @@ __global__ void fillNodeList2
 
         if ( Node::usesTwoArrays() )
         {
-            if ( node.bid() != 27 )
+            if ( !(newBid == 27 || newBid == 0) )
             {
                 uint surfNodeIdx = hashMap.get( n );
-                SNode surfNode = surfNodes[surfNodeIdx];
-                surfNode.orientation = newBid;
-                surfNodes[surfNodeIdx] = surfNode;
+                if ( surfNodeIdx != UINT32_MAX )
+                {
+                    SNode surfNode = surfNodes[surfNodeIdx];
+                    surfNode.orientation = newBid;
+                    surfNodes[surfNodeIdx] = surfNode;
+                }
             }
         }
         else
@@ -3167,8 +3172,11 @@ inline __device__ void processVoxel
                 }
             }
 
+            n.material = materials[triangleIdx];
+
             uint surfNodeIdx = hashMap.get( nodeIdx );
             surfNodes[surfNodeIdx] = n;
+            nodes[nodeIdx] = Node( 1 );
         }
         else
         {
