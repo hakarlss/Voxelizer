@@ -10,6 +10,7 @@
 #include <sm_12_atomic_functions.h>
 #include <sm_20_atomic_functions.h>
 //#include <sm_35_atomic_functions.h>
+#include <math_functions.h>
 
 #include <thrust/host_vector.h>
 #include <thrust/functional.h>
@@ -5314,6 +5315,7 @@ __device__ void constructAllPolyhedronFaces
     // Path 1: v0 -> v1.
     t = dot( triNormal, triangle[0] - vertices[0] ) / 
         dot( triNormal, vertices[1] - vertices[0] );
+    t = isfinite(t) ? t : -1.0f;
     if (t < 0.0f || t > 1.0f) // No intersection.
     {
         indices[ nrF1 ] = 1;
@@ -5324,6 +5326,7 @@ __device__ void constructAllPolyhedronFaces
         // Path 1: v1 -> v4
         t = dot( triNormal, triangle[0] - vertices[1] ) / 
             dot( triNormal, vertices[4] - vertices[1] );
+        t = isfinite(t) ? t : -1.0f;
         if (t < 0.0f || t > 1.0f) // No intersection.
         {
             indices[ nrF1 ] = 4;
@@ -5336,6 +5339,7 @@ __device__ void constructAllPolyhedronFaces
             // Path 1: v4 -> v7
             t = dot( triNormal, triangle[0] - vertices[4] ) / 
                 dot( triNormal, vertices[7] - vertices[4] );
+            t = isfinite(t) ? t : -1.0f;
             if (t < 0.0f || t > 1.0f) // No intersection.
             {
                 /*
@@ -5396,6 +5400,7 @@ __device__ void constructAllPolyhedronFaces
     // Path 1: v1 -> v5 (Extra)
     t = dot( triNormal, triangle[0] - vertices[1] ) / 
         dot( triNormal, vertices[5] - vertices[1] );
+    t = isfinite(t) ? t : -1.0f;
     if (t >= 0.0f && t <= 1.0f) // Intersection
     {
         vertices[ 8 + nrOfIPts ] = vertices[1] + t * (vertices[5] - vertices[1]);
@@ -5414,6 +5419,7 @@ __device__ void constructAllPolyhedronFaces
     // Path 2: v0 -> v2
     t = dot( triNormal, triangle[0] - vertices[0] ) / 
         dot( triNormal, vertices[2] - vertices[0] );
+    t = isfinite(t) ? t : -1.0f;
     if (t < 0.0f || t > 1.0f) // No intersection
     {
         indices[ 8*1 + nrF2 ] = 2;
@@ -5424,6 +5430,7 @@ __device__ void constructAllPolyhedronFaces
         // Path 2: v2 -> v5
         t = dot( triNormal, triangle[0] - vertices[2] ) / 
             dot( triNormal, vertices[5] - vertices[2] );
+        t = isfinite(t) ? t : -1.0f;
         if (t < 0.0f || t > 1.0f) // No intersection
         {
             indices[ 8*1 + nrF2 ] = 5;
@@ -5436,6 +5443,7 @@ __device__ void constructAllPolyhedronFaces
             // Path 2: v5 -> v7
             t = dot( triNormal, triangle[0] - vertices[5] ) / 
                 dot( triNormal, vertices[7] - vertices[5] );
+            t = isfinite(t) ? t : -1.0f;
             if (t < 0.0f || t > 1.0f) // No intersection
             {
                 indices[ nrF1 ] = 7;
@@ -5490,6 +5498,7 @@ __device__ void constructAllPolyhedronFaces
     // Path 2: v2 -> v6 (Extra)
     t = dot( triNormal, triangle[0] - vertices[2] ) / 
         dot( triNormal, vertices[6] - vertices[2] );
+    t = isfinite(t) ? t : -1.0f;
     if (t >= 0.0f && t <= 1.0f)
     {
         vertices[ 8 + nrOfIPts ] = vertices[2] + t * (vertices[6] - vertices[2]);
@@ -5505,6 +5514,7 @@ __device__ void constructAllPolyhedronFaces
     // Path 3: v0 -> v3
     t = dot( triNormal, triangle[0] - vertices[0] ) / 
         dot( triNormal, vertices[3] - vertices[0] );
+    t = isfinite(t) ? t : -1.0f;
     if (t < 0.0f || t > 1.0f) // No intersection
     {
         indices[ 8*2 + nrF3 ] = 3;
@@ -5515,6 +5525,7 @@ __device__ void constructAllPolyhedronFaces
         // Path 3: v3 -> v6
         t = dot( triNormal, triangle[0] - vertices[3] ) / 
             dot( triNormal, vertices[6] - vertices[3] );
+        t = isfinite(t) ? t : -1.0f;
         if (t < 0.0f || t > 1.0f) // No intersection
         {
             indices[ 8*2 + nrF3 ] = 6;
@@ -5527,6 +5538,7 @@ __device__ void constructAllPolyhedronFaces
             // Path 3: v6 -> v7
             t = dot( triNormal, triangle[0] - vertices[6] ) / 
                 dot(triNormal, vertices[7] - vertices[6] );
+            t = isfinite(t) ? t : -1.0f;
             if (t < 0.0f || t > 1.0f) // No intersection
             {
                 indices[ nrF1 ] = 7;
@@ -5581,6 +5593,7 @@ __device__ void constructAllPolyhedronFaces
     // Path 3: v3 -> v4 (Extra)
     t = dot( triNormal, triangle[0] - vertices[3] ) / 
         dot( triNormal, vertices[4] - vertices[3] );
+    t = isfinite(t) ? t : -1.0f;
     if (t >= 0.0f && t <= 1.0f) // Intersection
     {
         vertices[ 8 + nrOfIPts ] = vertices[3] + t * (vertices[4] - vertices[3]);

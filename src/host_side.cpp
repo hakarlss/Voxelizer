@@ -107,6 +107,7 @@ void Voxelizer<Node, SNode>::initVariables()
 
     this->hostVars.resolution.min = make_uint3( 0 );
     this->hostVars.resolution.max = make_uint3( 256, 0, 0 );
+    this->nrOfDevicesInUse = 0;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
