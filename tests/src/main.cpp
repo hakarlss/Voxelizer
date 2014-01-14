@@ -668,20 +668,24 @@ void renderSurfNodeOutput( Node * nodes
 
         SNode surfNode = surfNodes[surfNodeIdx];
 
+        
         if (materials)
         {
             // Ignore nodes with zero material.
             if (surfNode.material == 0)
                 continue;
         }
+        
 
         /*
         if ( surfNode.orientation == 0 || surfNode.orientation == 27 )
             continue;
         */
 
+        
         if ( surfNode.volume == 0.0f )
             continue;
+        
 
         uint x = nodeIdx % res.x;
         uint y = (nodeIdx % (res.x * res.y)) / res.x;
@@ -1962,7 +1966,7 @@ void performTwoArrayTest
     renderSurfNodeOutput( result[0].nodes
                         , result[0].surfNodes
                         , result[0].indices
-                        , false
+                        , renderMaterials
                         , result[0].dim );
 
     uint nrOfNodes = result[0].dim.x * result[0].dim.y * result[0].dim.z;

@@ -757,19 +757,19 @@ class VolumeNode
 {
 public:
     __host__ __device__ VolumeNode(): _bid(0) {}
-    __host__ __device__ VolumeNode( char type ): _bid(type) {}
-    __host__ __device__ VolumeNode( char type, char mat ): _bid(type) {}
-    __host__ __device__ VolumeNode( char type, char mat, float r ): _bid(type) {}
+    __host__ __device__ VolumeNode( uchar type ): _bid(type) {}
+    __host__ __device__ VolumeNode( uchar type, uchar mat ): _bid(type) {}
+    __host__ __device__ VolumeNode( uchar type, uchar mat, float r ): _bid(type) {}
     __host__ __device__ ~VolumeNode() {}
 
-    char _bid;
+    uchar _bid;
 
-    __host__ __device__ char mat() const { return 0; }
-    __host__ __device__ char bid() const { return _bid; }
+    __host__ __device__ uchar mat() const { return 0; }
+    __host__ __device__ uchar bid() const { return _bid; }
     __host__ __device__ float r() const { return 0.0f; }
 
-    __host__ __device__ void mat( char m ) {}
-    __host__ __device__ void bid( char b ) { _bid = b; }
+    __host__ __device__ void mat( uchar m ) {}
+    __host__ __device__ void bid( uchar b ) { _bid = b; }
     __host__ __device__ void r( float r ) {}
 
     ///////////////////////////////////////////////////////////////////////////
@@ -828,12 +828,12 @@ public:
         volume(0.0f), cutNormal(make_float3(0.0f, 0.0f, 0.0f)), cutArea(0.0f), 
         xPosArea(0.0f), xNegArea(0.0f), yPosArea(0.0f), yNegArea(0.0f), 
         zPosArea(0.0f), zNegArea(0.0f)/*, mergedNodes(UINT_MAX)*/ {}
-    __host__ __device__ SurfaceNode( uint32_t type, char mat ): 
+    __host__ __device__ SurfaceNode( uint32_t type, uchar mat ): 
         orientation(type), material(mat), volume(0.0f), 
         cutNormal(make_float3(0.0f, 0.0f, 0.0f)), cutArea(0.0f), 
         xPosArea(0.0f), xNegArea(0.0f), yPosArea(0.0f), yNegArea(0.0f), 
         zPosArea(0.0f), zNegArea(0.0f)/*, mergedNodes(UINT_MAX)*/ {}
-    __host__ __device__ SurfaceNode( uint32_t type, char mat, float r ): 
+    __host__ __device__ SurfaceNode( uint32_t type, uchar mat, float r ): 
         orientation(type), material(mat), volume(0.0f), 
         cutNormal(make_float3(0.0f, 0.0f, 0.0f)), cutArea(0.0f), 
         xPosArea(0.0f), xNegArea(0.0f), yPosArea(0.0f), yNegArea(0.0f), 
@@ -857,12 +857,12 @@ public:
 
     //uint mergedNodes;
 
-    __host__ __device__ uint32_t mat() const { return 0; }
-    __host__ __device__ uint32_t bid() const { return orientation; }
+    __host__ __device__ uchar mat() const { return 0; }
+    __host__ __device__ uchar bid() const { return orientation; }
     __host__ __device__ float r() const { return 0.0f; }
 
-    __host__ __device__ void mat( uint32_t m ) {}
-    __host__ __device__ void bid( uint32_t b ) {}
+    __host__ __device__ void mat( uchar m ) {}
+    __host__ __device__ void bid( uchar b ) {}
     __host__ __device__ void r( float r ) {}
 
     ///////////////////////////////////////////////////////////////////////////

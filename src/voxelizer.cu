@@ -2000,8 +2000,8 @@ __global__ void fillNodeList2
                     surfNodes[surfNodeIdx] = surfNode;
                 }
         }
-        else
-            nodes[n] = node;
+
+        nodes[n] = node;
     }
 }
 ///////////////////////////////////////////////////////////////////////////////
@@ -3175,8 +3175,12 @@ inline __device__ void processVoxel
             n.material = materials[triangleIdx];
 
             uint surfNodeIdx = hashMap.get( nodeIdx );
-            surfNodes[surfNodeIdx] = n;
-            nodes[nodeIdx] = Node( 1 );
+
+            if ( surfNodeIdx != UINT32_MAX )
+            {
+                surfNodes[surfNodeIdx] = n;
+                //nodes[nodeIdx] = Node( 1 );
+            }
         }
         else
         {
