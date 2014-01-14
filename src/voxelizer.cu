@@ -1983,14 +1983,10 @@ __global__ void fillNodeList2
 
         newBid = orientationLookup[permutation];
 
-        if ( !Node::usesTwoArrays() )
-            node.bid(newBid);
+        node.bid(newBid);
         
         if (newBid == 0)
         {
-            if ( Node::usesTwoArrays() )
-                node.bid(0);
-
             *error = true;
         }
 

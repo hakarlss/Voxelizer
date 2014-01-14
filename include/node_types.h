@@ -840,8 +840,8 @@ public:
         zPosArea(0.0f), zNegArea(0.0f)/*, mergedNodes(UINT_MAX)*/ {}
     __host__ __device__ ~SurfaceNode() {}
 
-    ushort orientation;
-    ushort material;
+    uchar orientation;
+    uchar material;
 
     float volume;
 
