@@ -658,8 +658,8 @@ void calcOptSurfaceVoxelization(
     clock_t                startTime, 
     bool                   verbose )
 {
-    uint blocks = devData.blocks;
-    uint threadsPerBlock = devData.threads;
+    uint blocks = 32;//devData.blocks;
+    uint threadsPerBlock = 64;//devData.threads;
 
     float3 modelBBMin = make_float3( float(devData.extMinVertex.x), 
                                      float(devData.extMinVertex.y), 
@@ -1879,10 +1879,6 @@ __global__ void fillNodeList2
     SNode * surfNodes
     )
 {
-    uint nrOfNodes, x, y, z;
-    uchar permutation, newBid;
-    Node node;
-
     uint3 res = resolution.max - resolution.min;
     uint npx = res.x;
     uint npy = npx * res.y;
@@ -1903,29 +1899,29 @@ __global__ void fillNodeList2
 
     __syncthreads();
 
-    nrOfNodes = npy * res.z;
+    uint nrOfNodes = npy * res.z;
     for ( uint n = startNode + blockIdx.x * blockDim.x + threadIdx.x; 
           n < nrOfNodes && n < endNode; 
           n += gridDim.x * blockDim.x )
     {
-        node = nodes[n];
+        Node node = nodes[n];
 
         // Don't process nodes that are non-solid.
         if (node.bid() == 0)
             continue;
 
-        y = (n % npy) / npx;
+        uint y = (n % npy) / npx;
 
         if ( y < space.min.x || y >= space.max.x )
             continue;
 
-        x = n % npx;
-        z = n / npy;
+        uint x = n % npx;
+        uint z = n / npy;
 
         if ( z < space.min.y || z >= space.max.y )
             continue;
 
-        permutation = 0;
+        uchar permutation = 0;
 
         if (x > 0)
         {
@@ -1981,7 +1977,7 @@ __global__ void fillNodeList2
             }
         }
 
-        newBid = orientationLookup[permutation];
+        uchar newBid = orientationLookup[permutation];
 
         node.bid(newBid);
         
@@ -1992,13 +1988,13 @@ __global__ void fillNodeList2
 
         if ( Node::usesTwoArrays() )
         {
-                uint surfNodeIdx = hashMap.get( n );
-                if ( surfNodeIdx != UINT32_MAX )
-                {
-                    SNode surfNode = surfNodes[surfNodeIdx];
-                    surfNode.orientation = newBid;
-                    surfNodes[surfNodeIdx] = surfNode;
-                }
+            uint surfNodeIdx = hashMap.get( n );
+            if ( surfNodeIdx != UINT32_MAX )
+            {
+                SNode surfNode = surfNodes[surfNodeIdx];
+                surfNode.orientation = newBid;
+                surfNodes[surfNodeIdx] = surfNode;
+            }
         }
 
         nodes[n] = node;

@@ -651,8 +651,10 @@ void renderSurfNodeOutput( Node * nodes
 
     for (uint nodeIdx = 0; nodeIdx < res.x * res.y * res.z; nodeIdx++)
     {
-        /*
+        
         // Ignore non-solid nodes.
+        
+        /*
         if (nodes[nodeIdx].bid() == 0)
             continue;
 
@@ -662,41 +664,45 @@ void renderSurfNodeOutput( Node * nodes
         */
 
         uint surfNodeIdx = hashMap.get( nodeIdx );
-
+        
         if ( surfNodeIdx == UINT32_MAX )
             continue;
 
         SNode surfNode = surfNodes[surfNodeIdx];
-
         
+        
+        /*
         if (materials)
         {
             // Ignore nodes with zero material.
             if (surfNode.material == 0)
                 continue;
         }
-        
+        */
 
         /*
         if ( surfNode.orientation == 0 || surfNode.orientation == 27 )
             continue;
         */
-
         
+        /*
         if ( surfNode.volume == 0.0f )
             continue;
-        
+        */
 
         uint x = nodeIdx % res.x;
         uint y = (nodeIdx % (res.x * res.y)) / res.x;
         uint z = nodeIdx / (res.x * res.y);
 
         points->InsertNextPoint(double(x), double(y), double(z));
-
+        
+        /*
         if (materials)
             colors->InsertNextTupleValue(colorList[surfNode.material]);
         else
-            colors->InsertNextTupleValue(white);
+        */
+        
+        colors->InsertNextTupleValue(white);
     }
 
     vtkSmartPointer<vtkPolyData> data = vtkSmartPointer<vtkPolyData>::New();
@@ -2332,10 +2338,10 @@ void analyzeSurfaceNodes( Node * nodes
         orientations[n.orientation] += 1;
 
         if ( n.material != 0 ) nodesWithMaterials++;
-        if ( n.volume != 0.0f ) nodesWithVolume++;
-        if ( n.xPosArea != 0.0f || n.xNegArea != 0.0f || 
-             n.yPosArea != 0.0f || n.yNegArea != 0.0f || 
-             n.zPosArea != 0.0f || n.zNegArea != 0.0f || n.cutArea != 0.0f )
+        if ( n.volume > 0.0f ) nodesWithVolume++;
+        if ( n.xPosArea > 0.0f || n.xNegArea > 0.0f || 
+             n.yPosArea > 0.0f || n.yNegArea > 0.0f || 
+             n.zPosArea > 0.0f || n.zNegArea > 0.0f || n.cutArea > 0.0f )
         {
             nodesWithAreas++;
         }
@@ -2361,7 +2367,7 @@ void analyzeSurfaceNodes( Node * nodes
 
     std::cout << "Orientation spread among surface nodes:\n";
     for ( int i = 0; i < 10; ++i )
-        std::cout << "Orientation 0" << i << ": " << orientations[i] << "\n";
+        std::cout << "Orientation  " << i << ": " << orientations[i] << "\n";
     for ( int i = 10; i < 28; ++i )
         std::cout << "Orientation " << i << ": " << orientations[i] << "\n";
 

@@ -1711,7 +1711,6 @@ void Voxelizer<Node, SNode>::twoNodeArraysWorker(
     uint3 matSplitRes,
     DevContext<Node,SNode> & device )
 {
-    std::cout << "Entered twoNodeArraysWorker\n";
     // All processing in this thread will use this device.
     cudaSetDevice( device.data.dev );
 
@@ -1943,7 +1942,9 @@ void Voxelizer<Node, SNode>::twoNodeArraysWorker(
                      , this->startTime
                      , this->options.verbose );
 
-    std::cout << "Number of surface nodes: " << device.data.nrOfSurfaceNodes << "\n";
+    if ( this->options.verbose ) 
+        std::cout << "Number of surface nodes: " << 
+                     device.data.nrOfSurfaceNodes << "\n";
 
     // Allocate Surface node array and HashMap.
 
