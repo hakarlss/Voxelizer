@@ -3120,15 +3120,15 @@ inline __device__ void processVoxel
             n.volume = volume;
 
             n.cutNormal = triNormal;
-            n.cutArea = a0;
+            n.cutArea = abs(a0);
 
-            n.xPosArea = a1;
-            n.xNegArea = a6;
+            n.xPosArea = abs(a1);
+            n.xNegArea = abs(a6);
 
             if ( a6 < 0.0f )
             {
-                n.xPosArea = a6;
-                n.xNegArea = a1;
+                n.xPosArea = abs(a6);
+                n.xNegArea = abs(a1);
             }
 
             bool x = triNormal.x >= 0.0f;
@@ -3137,42 +3137,42 @@ inline __device__ void processVoxel
 
             if ( (x + y + z) % 2 == 1 )
             {   // Don't swap y and z.
-                n.yPosArea = a2;
-                n.yNegArea = a5;
+                n.yPosArea = abs(a2);
+                n.yNegArea = abs(a5);
 
                 if ( a5 < 0.0f )
                 {
-                    n.yPosArea = a5;
-                    n.yNegArea = a2;
+                    n.yPosArea = abs(a5);
+                    n.yNegArea = abs(a2);
                 }
 
-                n.zPosArea = a3;
-                n.zNegArea = a4;
+                n.zPosArea = abs(a3);
+                n.zNegArea = abs(a4);
 
                 if ( a4 <= 0.0f )
                 {
-                    n.zPosArea = a4;
-                    n.zNegArea = a3;
+                    n.zPosArea = abs(a4);
+                    n.zNegArea = abs(a3);
                 }
             }
             else
             {   // Swap y and z.
-                n.yPosArea = a3;
-                n.yNegArea = a4;
+                n.yPosArea = abs(a3);
+                n.yNegArea = abs(a4);
 
                 if ( a4 < 0.0f )
                 {
-                    n.yPosArea = a4;
-                    n.yNegArea = a3;
+                    n.yPosArea = abs(a4);
+                    n.yNegArea = abs(a3);
                 }
 
-                n.zPosArea = a2;
-                n.zNegArea = a5;
+                n.zPosArea = abs(a2);
+                n.zNegArea = abs(a5);
 
                 if ( a5 < 0.0f )
                 {
-                    n.zPosArea = a5;
-                    n.zNegArea = a2;
+                    n.zPosArea = abs(a5);
+                    n.zNegArea = abs(a2);
                 }
             }
 
