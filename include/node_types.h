@@ -862,7 +862,7 @@ public:
     __host__ __device__ float r() const { return 0.0f; }
 
     __host__ __device__ void mat( uchar m ) {}
-    __host__ __device__ void bid( uchar b ) {}
+    __host__ __device__ void bid( uchar b ) { orientation = b; }
     __host__ __device__ void r( float r ) {}
 
     ///////////////////////////////////////////////////////////////////////////

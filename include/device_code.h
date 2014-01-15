@@ -331,9 +331,8 @@ template <class Node, class SNode> __device__
                      , float3 triNormal
                      , float3 modelBBMin
                      , float voxelLength
-                     , int x
-                     , int y
-                     , int z
+                     , int3 coords
+                     , int3 adjustments
                      , int gridType
                      , uint3 resolution
                      , bool countVoxels

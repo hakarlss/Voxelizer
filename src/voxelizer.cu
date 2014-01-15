@@ -2440,9 +2440,8 @@ __global__ void SimpleSurfaceVoxelizer
                                         , triNormal
                                         , modelBBMin
                                         , voxelLength
-                                        , i
-                                        , j
-                                        , k
+                                        , make_int3( i, j, k )
+                                        , make_int3( 0, 0, 0 )
                                         , 1
                                         , resolution
                                         , false
@@ -3052,9 +3051,8 @@ inline __device__ void processVoxel
     , float3 modelBBMin       /**< [in] Minimum corner of the device's voxel 
                                         space. */
     , float voxelLength       ///< [in] Distance between voxel centers.
-    , int x                   ///< [in] X coordinate of the voxel.
-    , int y                   ///< [in] Y coordinate of the voxel.
-    , int z                   ///< [in] Z coordinate of the voxel.
+    , int3 coords
+    , int3 adjs
     , int gridType            ///< [in] How the grid is shifted - 1 for normal.
     , uint3 resolution        ///< [in] Dimensions of the device's voxel space.
     , bool countVoxels
@@ -3064,19 +3062,23 @@ inline __device__ void processVoxel
 {
     uint nodeIdx = 0;
 
+    uint x = coords.x + adjs.x;
+    uint y = coords.y + adjs.y;
+    uint z = coords.z + adjs.z;
+
     if ( Node::isFCCNode() )
     {   // The node is to be written into a FCC grid.
         const uint l = 2 * resolution.x;
         const uint a = l * resolution.y;
         
         if ( gridType == 1 )
-            nodeIdx = a * 2*uint(z) + l * uint(y) + 2*uint(x);
+            nodeIdx = a * 2*z + l * y + 2*x;
         else if ( gridType == 2 )
-            nodeIdx = a * 2*uint(z) + l * uint(y) + 2*uint(x) + 1;
+            nodeIdx = a * 2*z + l * y + 2*x + 1;
         else if ( gridType == 3 )
-            nodeIdx = a * (2*uint(z) + 1) + l * uint(y) + 2*uint(x);
+            nodeIdx = a * (2*z + 1) + l * y + 2*x;
         else if ( gridType == 4 )
-            nodeIdx = a * (2*uint(z) + 1) + l * uint(y) + 2*uint(x) + 1;
+            nodeIdx = a * (2*z + 1) + l * y + 2*x + 1;
     }
     else
     {   // The node is to be written into a normal grid.
@@ -3084,7 +3086,7 @@ inline __device__ void processVoxel
         const uint l = resolution.x;
         const uint a = l * resolution.y;
 
-        nodeIdx = a * uint(z) + l * uint(y) + uint(x);
+        nodeIdx = a*z + l*y + x;
     }
 
     if ( countVoxels )
@@ -3101,7 +3103,9 @@ inline __device__ void processVoxel
             float a0, a1, a2, a3, a4, a5, a6;
             float volume = 
                 calculateCutVolumeAndAreas( triangle
-                                          , make_int3( x, y, z )
+                                          , make_int3( coords.x
+                                                     , coords.y
+                                                     , coords.z )
                                           , triNormal
                                           , modelBBMin
                                           , voxelLength
@@ -3189,7 +3193,7 @@ inline __device__ void processVoxel
             // Calculate the fractional volume of the cut voxel.
             volume = calculateVoxelPlaneIntersectionVolume( 
                 triangle, 
-                make_int3( x, y, z ), 
+                make_int3( coords.x, coords.y, coords.z ), 
                 triNormal, 
                 modelBBMin, 
                 voxelLength );
@@ -3557,46 +3561,78 @@ __global__ void process1DTriangles
         int3 const adjustment = { 1,
                                   left ? 0 : 1,
                                   down ? 0 : 1 };
-        voxBB.min += adjustment;
-        voxBB.max += adjustment;
+        //voxBB.min += adjustment;
+        //voxBB.max += adjustment;
 
         uint3 res = totalResolution.max - totalResolution.min;
 
         res.y += adjustment.y + (right ? 0 : 1);
         res.z += adjustment.z + (up ? 0 : 1);
 
+        float3 triNormal = 
+            Node::hasRatio() ? cross( triangle[0] - triangle[2]
+                                    , triangle[1] - triangle[0] )
+                             : make_float3( 0.0f );
+
         // Process the voxels.
         if (domAxis == xAxis)
         {
             for ( int i = voxBB.min.x; i <= voxBB.max.x; i++ )
             {
-                processVoxel( nodes,       materials,         triIdx,      
-                    triangle,    make_float3(0.0f), modelBBMin, 
-                    voxelLength, i,                 voxBB.min.y, 
-                    voxBB.min.z, gridType,          res,
-                    countVoxels, hashMap, surfNodes );
+                processVoxel( nodes
+                            , materials
+                            , triIdx
+                            , triangle
+                            , triNormal
+                            , modelBBMin
+                            , voxelLength
+                            , make_int3( i, voxBB.min.y, voxBB.min.z )
+                            , adjustment
+                            , gridType
+                            , res
+                            , countVoxels
+                            , hashMap
+                            , surfNodes );
             }
         }
         else if (domAxis == yAxis)
         {
             for ( int j = voxBB.min.y; j <= voxBB.max.y; j++ )
             {
-                processVoxel( nodes,       materials,         triIdx, 
-                    triangle,    make_float3(0.0f), modelBBMin, 
-                    voxelLength, voxBB.min.x,       j, 
-                    voxBB.min.z, gridType,          res,
-                    countVoxels, hashMap, surfNodes );
+                processVoxel( nodes
+                            , materials
+                            , triIdx
+                            , triangle
+                            , make_float3(0.0f)
+                            , modelBBMin
+                            , voxelLength
+                            , make_int3( voxBB.min.x, j, voxBB.min.z )
+                            , adjustment
+                            , gridType
+                            , res
+                            , countVoxels
+                            , hashMap
+                            , surfNodes );
             }
         }
         else
         {
             for ( int k = voxBB.min.z; k <= voxBB.max.z; k++ )
             {
-                processVoxel( nodes,       materials,         triIdx, 
-                    triangle,    make_float3(0.0f), modelBBMin, 
-                    voxelLength, voxBB.min.x,       voxBB.min.y, 
-                    k,           gridType,          res,
-                    countVoxels, hashMap, surfNodes );
+                processVoxel( nodes
+                            , materials
+                            , triIdx
+                            , triangle
+                            , make_float3(0.0f)
+                            , modelBBMin
+                            , voxelLength
+                            , make_int3( voxBB.min.x, voxBB.min.y, k )
+                            , adjustment
+                            , gridType
+                            , res
+                            , countVoxels
+                            , hashMap
+                            , surfNodes );
             }
         }
     }
@@ -3709,21 +3745,20 @@ __global__ void process2DTriangles
                                                            voxelLength ) );
                     if ( overlapTestYZ( data, p ) )
                     {
-                        processVoxel( nodes, 
-                            materials, 
-                            triIdx, 
-                            triangle, 
-                            triNormal,
-                            modelBBMin, 
-                            voxelLength, 
-                            voxBB.min.x + adjs.x, 
-                            j + adjs.y, 
-                            k + adjs.z,
-                            gridType,
-                            res,
-                            countVoxels,
-                            hashMap,
-                            surfNodes );
+                        processVoxel( nodes
+                                    , materials
+                                    , triIdx
+                                    , triangle
+                                    , triNormal
+                                    , modelBBMin
+                                    , voxelLength
+                                    , make_int3( voxBB.min.x, j, k )
+                                    , adjs
+                                    , gridType
+                                    , res
+                                    , countVoxels
+                                    , hashMap
+                                    , surfNodes );
                     }
                 }
             }
@@ -3746,21 +3781,20 @@ __global__ void process2DTriangles
                                                        voxelLength ) );
                     if ( overlapTestZX( data, p ) )
                     {
-                        processVoxel( nodes, 
-                            materials,
-                            triIdx,
-                            triangle,  
-                            triNormal, 
-                            modelBBMin, 
-                            voxelLength, 
-                            i + adjs.x, 
-                            voxBB.min.y + adjs.y,
-                            k + adjs.z, 
-                            gridType,
-                            res,
-                            countVoxels,
-                            hashMap,
-                            surfNodes );
+                        processVoxel( nodes
+                                    , materials
+                                    , triIdx
+                                    , triangle
+                                    , triNormal
+                                    , modelBBMin
+                                    , voxelLength
+                                    , make_int3( i, voxBB.min.y, k )
+                                    , adjs
+                                    , gridType
+                                    , res
+                                    , countVoxels
+                                    , hashMap
+                                    , surfNodes );
                     }
                 }
             }
@@ -3783,21 +3817,20 @@ __global__ void process2DTriangles
                         0.0f );
                     if ( overlapTestXY( data, p ) )
                     {
-                        processVoxel( nodes, 
-                            materials, 
-                            triIdx, 
-                            triangle, 
-                            triNormal, 
-                            modelBBMin, 
-                            voxelLength, 
-                            i + adjs.x, 
-                            j + adjs.y, 
-                            voxBB.min.z + adjs.z, 
-                            gridType,
-                            res,
-                            countVoxels,
-                            hashMap,
-                            surfNodes );
+                        processVoxel( nodes
+                                    , materials
+                                    , triIdx
+                                    , triangle
+                                    , triNormal
+                                    , modelBBMin
+                                    , voxelLength
+                                    , make_int3( i, j, voxBB.min.z )
+                                    , adjs
+                                    , gridType
+                                    , res
+                                    , countVoxels
+                                    , hashMap
+                                    , surfNodes );
                     }
                 }
             }
@@ -3942,21 +3975,20 @@ __global__ void process3DTriangles
                         // only one voxel thick.
                         if ( voxRange.x == voxRange.y )
                         {
-                            processVoxel( nodes, 
-                                materials, 
-                                triIdx, 
-                                triangle, 
-                                triNormal, 
-                                modelBBMin, 
-                                voxelLength, 
-                                voxRange.x + adjs.x, 
-                                j + adjs.y, 
-                                k + adjs.z, 
-                                gridType,
-                                res,
-                                countVoxels,
-                                hashMap,
-                                surfNodes );
+                            processVoxel( nodes
+                                        , materials
+                                        , triIdx
+                                        , triangle
+                                        , triNormal
+                                        , modelBBMin
+                                        , voxelLength
+                                        , make_int3( voxRange.x, j, k )
+                                        , adjs
+                                        , gridType
+                                        , res
+                                        , countVoxels
+                                        , hashMap
+                                        , surfNodes );
                         }
                         else
                         {
@@ -3972,21 +4004,20 @@ __global__ void process3DTriangles
                                 {
                                     if ( overlapTestXY( data[2], p ) )
                                     {
-                                        processVoxel( nodes, 
-                                            materials, 
-                                            triIdx, 
-                                            triangle, 
-                                            triNormal, 
-                                            modelBBMin, 
-                                            voxelLength, 
-                                            i + adjs.x, 
-                                            j + adjs.y, 
-                                            k + adjs.z, 
-                                            gridType,
-                                            res,
-                                            countVoxels,
-                                            hashMap,
-                                            surfNodes );
+                                        processVoxel( nodes
+                                                    , materials
+                                                    , triIdx
+                                                    , triangle
+                                                    , triNormal
+                                                    , modelBBMin
+                                                    , voxelLength
+                                                    , make_int3( i, j, k )
+                                                    , adjs
+                                                    , gridType
+                                                    , res
+                                                    , countVoxels
+                                                    , hashMap
+                                                    , surfNodes );
                                     }
                                 }
                             }
@@ -4036,21 +4067,20 @@ __global__ void process3DTriangles
                         // only one voxel thick.
                         if (voxRange.x == voxRange.y)
                         {
-                            processVoxel( nodes, 
-                                materials, 
-                                triIdx, 
-                                triangle, 
-                                triNormal, 
-                                modelBBMin, 
-                                voxelLength, 
-                                i + adjs.x, 
-                                voxRange.x + adjs.y, 
-                                k + adjs.z, 
-                                gridType,
-                                res,
-                                countVoxels,
-                                hashMap,
-                                surfNodes );
+                            processVoxel( nodes
+                                        , materials
+                                        , triIdx
+                                        , triangle
+                                        , triNormal
+                                        , modelBBMin
+                                        , voxelLength
+                                        , make_int3( i, voxRange.x, k )
+                                        , adjs
+                                        , gridType
+                                        , res
+                                        , countVoxels
+                                        , hashMap
+                                        , surfNodes );
                         }
                         else
                         {
@@ -4066,21 +4096,20 @@ __global__ void process3DTriangles
                                 {
                                     if ( overlapTestYZ( data[0], p ) )
                                     {
-                                        processVoxel( nodes, 
-                                            materials, 
-                                            triIdx, 
-                                            triangle, 
-                                            triNormal, 
-                                            modelBBMin, 
-                                            voxelLength, 
-                                            i + adjs.x, 
-                                            j + adjs.y, 
-                                            k + adjs.z, 
-                                            gridType,
-                                            res,
-                                            countVoxels,
-                                            hashMap,
-                                            surfNodes );
+                                        processVoxel( nodes
+                                                    , materials
+                                                    , triIdx
+                                                    , triangle
+                                                    , triNormal
+                                                    , modelBBMin
+                                                    , voxelLength
+                                                    , make_int3( i, j, k )
+                                                    , adjs
+                                                    , gridType
+                                                    , res
+                                                    , countVoxels
+                                                    , hashMap
+                                                    , surfNodes );
                                     }
                                 }
                             }
@@ -4132,21 +4161,20 @@ __global__ void process3DTriangles
                            only one voxel thick. */
                         if (voxRange.x == voxRange.y)
                         {
-                            processVoxel( nodes, 
-                                materials, 
-                                triIdx, 
-                                triangle, 
-                                triNormal, 
-                                modelBBMin, 
-                                voxelLength, 
-                                i + adjs.x, 
-                                j + adjs.y, 
-                                voxRange.x + adjs.z, 
-                                gridType,
-                                res,
-                                countVoxels,
-                                hashMap,
-                                surfNodes );
+                            processVoxel( nodes
+                                        , materials
+                                        , triIdx
+                                        , triangle
+                                        , triNormal
+                                        , modelBBMin
+                                        , voxelLength
+                                        , make_int3( i, j, voxRange.x )
+                                        , adjs
+                                        , gridType
+                                        , res
+                                        , countVoxels
+                                        , hashMap
+                                        , surfNodes );
                         }
                         else
                         {
@@ -4162,21 +4190,20 @@ __global__ void process3DTriangles
                                 {
                                     if ( overlapTestZX( data[1], p ) )
                                     {
-                                        processVoxel( nodes, 
-                                            materials, 
-                                            triIdx, 
-                                            triangle, 
-                                            triNormal, 
-                                            modelBBMin, 
-                                            voxelLength, 
-                                            i + adjs.x, 
-                                            j + adjs.y, 
-                                            k + adjs.z, 
-                                            gridType,
-                                            res,
-                                            countVoxels,
-                                            hashMap,
-                                            surfNodes );
+                                        processVoxel( nodes
+                                                    , materials
+                                                    , triIdx
+                                                    , triangle
+                                                    , triNormal
+                                                    , modelBBMin
+                                                    , voxelLength
+                                                    , make_int3( i, j, k )
+                                                    , adjs
+                                                    , gridType
+                                                    , res
+                                                    , countVoxels
+                                                    , hashMap
+                                                    , surfNodes );
                                     }
                                 }
                             }
