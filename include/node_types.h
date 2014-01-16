@@ -181,7 +181,13 @@ public:
     /// \param[in] mat <em>Material id</em>.
     ///////////////////////////////////////////////////////////////////////////
     __host__ __device__ LongNode(uchar bid, uchar mat): _bid(bid), _mat(mat) {}
-
+    ///////////////////////////////////////////////////////////////////////////
+    /// \brief Constructor that takes three parameters.
+    ///
+    /// \param[in] bid Boundary id.
+    /// \param[in] mat Material id.
+    /// \param[in] r Ratio. Has no effect.
+    ///////////////////////////////////////////////////////////////////////////
     __host__ __device__ 
     LongNode(uchar bid, uchar mat, float r): _bid(bid), _mat(mat) {}
     ///////////////////////////////////////////////////////////////////////////
@@ -487,7 +493,14 @@ public:
     ///////////////////////////////////////////////////////////////////////////
     __host__ __device__ 
     ShortFCCNode( ushort bid, ushort mat ) { set( mat, bid ); }
-
+    ///////////////////////////////////////////////////////////////////////////
+    /// \brief Constructs \p ShortFCCNode given both a <em>material id</em> and 
+    /// <em>boundary id</em> and ratio.
+    /// 
+    /// \param[in] mat <em>Material id</em>.
+    /// \param[in] bid <em>Boundary id</em>.
+    /// \param[in] r Ratio. Has no effect.
+    ///////////////////////////////////////////////////////////////////////////
     __host__ __device__ 
     ShortFCCNode( ushort bid, ushort mat, float r ) { set( mat, bid ); }
     ///////////////////////////////////////////////////////////////////////////
@@ -656,7 +669,14 @@ public:
     ///////////////////////////////////////////////////////////////////////////
     __host__ __device__ 
     LongFCCNode( ushort bid, uchar mat ): _bid(bid), _mat(mat) {}
-
+    ///////////////////////////////////////////////////////////////////////////
+    /// \brief Constructs \p LongFCCNode given both a <em>material id</em> and 
+    /// <em>boundary id</em> and ratio.
+    /// 
+    /// \param[in] mat <em>Material id</em>.
+    /// \param[in] bid <em>Boundary id</em>.
+    /// \param[in] r Ratio. Has no effect.
+    ///////////////////////////////////////////////////////////////////////////
     __host__ __device__ 
     LongFCCNode( ushort bid, uchar mat, float r ): _bid(bid), _mat(mat) {}
     ///////////////////////////////////////////////////////////////////////////
@@ -751,27 +771,40 @@ private:
 };
 
 ///////////////////////////////////////////////////////////////////////////////
+/// \brief A \p Node type used as a solid node when producing a twin array 
+///        voxelization.
 ///
+/// Practically identical to \p ShortNode. Could probably be replaced by it 
+/// without any big changes.
 ///////////////////////////////////////////////////////////////////////////////
 class VolumeNode
 {
 public:
+    /// Default constructor.
     __host__ __device__ VolumeNode(): _bid(0) {}
+    /// Constructor that takes bid.
     __host__ __device__ VolumeNode( uchar type ): _bid(type) {}
+    /// Constructor that takes bid, mat - ignores mat.
     __host__ __device__ VolumeNode( uchar type, uchar mat ): _bid(type) {}
+    /// Constructor that takes bid, mat, r - ignores mat, r.
     __host__ __device__ VolumeNode( uchar type, uchar mat, float r ): _bid(type) {}
+    /// Default destructor - does nothing.
     __host__ __device__ ~VolumeNode() {}
 
-    uchar _bid;
+    uchar _bid; ///< Boundary id.
 
+    /// Getter for material id, always returns 0.
     __host__ __device__ uchar mat() const { return 0; }
+    /// Getter for boundary id.
     __host__ __device__ uchar bid() const { return _bid; }
+    /// Getter for ratio, always return 0.
     __host__ __device__ float r() const { return 0.0f; }
-
+    /// Setter for material id, does nothing.
     __host__ __device__ void mat( uchar m ) {}
+    /// Setter for boundary id.
     __host__ __device__ void bid( uchar b ) { _bid = b; }
+    /// Setter for ratio, does nothing.
     __host__ __device__ void r( float r ) {}
-
     ///////////////////////////////////////////////////////////////////////////
     /// \brief Returns \p true if the \p Node is meant to be used in 
     ///        conjunction with another \p Node type for surface nodes.
@@ -779,33 +812,49 @@ public:
     /// \return \p true.
     ///////////////////////////////////////////////////////////////////////////
     static __host__ __device__ bool usesTwoArrays() { return true; }
+    /// This is not a FCC node so returns false.
     static __host__ __device__ bool isFCCNode() { return false; }
+    /// This node leads to a node with ratio, so returns true.
     static __host__ __device__ bool hasRatio() { return true; }
+    /// The maximum material is set to 255 for convenience.
     static __host__ __device__ uchar maxMat() { return 255; }
 };
 
 ///////////////////////////////////////////////////////////////////////////////
+/// \brief A \p Node type used as a solid node when producing a twin array 
+///        voxelization.
 ///
+/// Meant to directly contain an index into the surface node array. Not 
+/// currently used anywhere.
 ///////////////////////////////////////////////////////////////////////////////
 class VolumeMapNode
 {
 public:
+    /// Default constructor.
     __host__ __device__ VolumeMapNode(): _bid(0) {}
+    /// Constructor with bid.
     __host__ __device__ VolumeMapNode( uint32_t i ): _bid(i) {}
+    /// Constructor with bid, mat - ignores mat.
     __host__ __device__ VolumeMapNode( uint32_t type, char mat ): _bid(type) {}
+    /// Constructor with bid, mat, r - ignores mat, r.
     __host__ __device__ VolumeMapNode( uint32_t type, char mat, float r ): _bid(type) {}
+    /// Default destructor - does nothing.
     __host__ __device__ ~VolumeMapNode() {}
 
-    uint32_t _bid;
+    uint32_t _bid;  ///< Index into a surface node array.
 
+    /// Getter for mat - always returns 0.
     __host__ __device__ uint32_t mat() const { return 0; }
+    /// Getter for bid.
     __host__ __device__ uint32_t bid() const { return _bid; }
+    /// Getter for r - always returns 0.
     __host__ __device__ float r() const { return 0.0f; }
-
+    /// Setter for material id - does nothing.
     __host__ __device__ void mat( uint32_t m ) {}
+    /// Setter for boundary id.
     __host__ __device__ void bid( uint32_t b ) { _bid = b; }
+    /// Setter for ratio - does nothing.
     __host__ __device__ void r( float r ) {}
-
     ///////////////////////////////////////////////////////////////////////////
     /// \brief Returns \p true if the \p Node is meant to be used in 
     ///        conjunction with another \p Node type for surface nodes.
@@ -813,56 +862,68 @@ public:
     /// \return \p true.
     ///////////////////////////////////////////////////////////////////////////
     static __host__ __device__ bool usesTwoArrays() { return true; }
+    /// Returns false as this is not a FCC node.
     static __host__ __device__ bool isFCCNode() { return false; }
+    /// Returns true as this node points to a node with a ratio.
     static __host__ __device__ bool hasRatio() { return true; }
+    /// Returns a max material id of 255 for convenience.
     static __host__ __device__ uchar maxMat() { return 255; }
 };
 
 ///////////////////////////////////////////////////////////////////////////////
-/// sizeof(SurfaceNode) = 52
+/// \brief 
 ///////////////////////////////////////////////////////////////////////////////
 class SurfaceNode
 {
 public:
+    /// Default constructor.
     __host__ __device__ SurfaceNode(): orientation(0), material(0), 
         volume(0.0f), cutNormal(make_float3(0.0f, 0.0f, 0.0f)), cutArea(0.0f), 
         xPosArea(0.0f), xNegArea(0.0f), yPosArea(0.0f), yNegArea(0.0f), 
         zPosArea(0.0f), zNegArea(0.0f)/*, mergedNodes(UINT_MAX)*/ {}
+    /// Constructor with bid, mat.
     __host__ __device__ SurfaceNode( uint32_t type, uchar mat ): 
         orientation(type), material(mat), volume(0.0f), 
         cutNormal(make_float3(0.0f, 0.0f, 0.0f)), cutArea(0.0f), 
         xPosArea(0.0f), xNegArea(0.0f), yPosArea(0.0f), yNegArea(0.0f), 
         zPosArea(0.0f), zNegArea(0.0f)/*, mergedNodes(UINT_MAX)*/ {}
+    /// Constructor with bid, mat, r - ignores r.
     __host__ __device__ SurfaceNode( uint32_t type, uchar mat, float r ): 
         orientation(type), material(mat), volume(0.0f), 
         cutNormal(make_float3(0.0f, 0.0f, 0.0f)), cutArea(0.0f), 
         xPosArea(0.0f), xNegArea(0.0f), yPosArea(0.0f), yNegArea(0.0f), 
         zPosArea(0.0f), zNegArea(0.0f)/*, mergedNodes(UINT_MAX)*/ {}
+    /// Default destructor.
     __host__ __device__ ~SurfaceNode() {}
 
-    uchar orientation;
-    uchar material;
+    uchar orientation;      ///< Boundary id.
+    uchar material;         ///< Material id.
 
-    float volume;
+    float volume;           ///< Volume of voxel that is inside model.
 
-    float3 cutNormal;
-    float cutArea;
+    float3 cutNormal;       ///< Normal of the cut polygon.
+    float cutArea;          ///< Area of the cut polygon.
 
-    float xPosArea;
-    float xNegArea;
-    float yPosArea;
-    float yNegArea;
-    float zPosArea;
-    float zNegArea;
+    float xPosArea;         ///< Area of the cut surface along +x.
+    float xNegArea;         ///< Area of the cut surface along -x.
+    float yPosArea;         ///< Area of the cut surface along +y.
+    float yNegArea;         ///< Area of the cut surface along -y.
+    float zPosArea;         ///< Area of the cut surface along +z.
+    float zNegArea;         ///< Area of the cut surface along -z.
 
     //uint mergedNodes;
 
+    /// Getter for material id, always returns 0.
     __host__ __device__ uchar mat() const { return 0; }
+    /// Getter for boundary id.
     __host__ __device__ uchar bid() const { return orientation; }
+    /// Getter for ratio, always returns 0.
     __host__ __device__ float r() const { return 0.0f; }
-
+    /// Setter for material id, does nothing.
     __host__ __device__ void mat( uchar m ) {}
+    /// Setter for boundary id.
     __host__ __device__ void bid( uchar b ) { orientation = b; }
+    /// Setter for ratio, does nothing.
     __host__ __device__ void r( float r ) {}
 
     ///////////////////////////////////////////////////////////////////////////
@@ -872,8 +933,11 @@ public:
     /// \return \p true.
     ///////////////////////////////////////////////////////////////////////////
     static __host__ __device__ bool usesTwoArrays() { return true; }
+    /// Returns false as this is not a FCC node.
     static __host__ __device__ bool isFCCNode() { return false; }
+    /// Returns false as this is irrelevant.
     static __host__ __device__ bool hasRatio() { return false; }
+    /// Returns zero as it is irrelevant.
     static __host__ __device__ uchar maxMat() { return 0; }
 };
 

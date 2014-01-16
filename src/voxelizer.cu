@@ -1756,7 +1756,12 @@ __global__ void constructNodeList2
 
         nodeIdx = res.x * res.y * z + res.x * y + VOX_BPI * x + bit;
 
-        if ( node.bid() != 0 ) nodes[nodeIdx] = node;
+        if ( Node::usesTwoArrays() )
+        {
+            if ( node.bid() != 0 ) nodes[nodeIdx] = node;
+        }
+        else
+            nodes[nodeIdx] = node;
     }
 }
 ///////////////////////////////////////////////////////////////////////////////

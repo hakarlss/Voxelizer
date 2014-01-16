@@ -554,9 +554,10 @@ void Voxelizer<Node, SNode>::reAllocDynamicMem(
 ///         other relevant information, such as the size of the array.
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node, class SNode> 
-std::vector<NodePointer<Node> >  Voxelizer<Node, SNode>::voxelize( uint  maxDimension,
-                                uint2 devConfig,
-                                uint3 voxSplitRes )
+std::vector<NodePointer<Node> > Voxelizer<Node, SNode>::voxelize
+    ( uint  maxDimension
+    , uint2 devConfig
+    , uint3 voxSplitRes )
 {
     std::vector<NodePointer<Node> > result;
 
@@ -1701,7 +1702,22 @@ void Voxelizer<Node, SNode>::fccWorker(
     }
 }
 ///////////////////////////////////////////////////////////////////////////////
-/// 
+/// A worker function that orchestrates the actual voxelization. This function 
+/// can be called by multiple threads simultaneously, as long as the devices
+/// the threads use are different. This is a specialized version for \p Nodes 
+/// with two arrays: One for the volumetric voxels and one for the surface 
+/// voxels.
+///
+/// \throws Exception if CUDA fails for whatever reason.
+///
+/// \param[in] xRes The maximum allowable size along the x-axis for one 
+///                 voxelization round.
+/// \param[in] xSplits The number of splits along the x-axis.
+/// \param[in] voxSplitRes The maximum allowable sizes along each direction for 
+///                        one voxelization round.
+/// \param[in] matSplitRes The maximum allowable sizes along each direction for 
+///                        one voxelization round.
+/// \param[in] device The device the voxelization should be performed on.
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node, class SNode> 
 void Voxelizer<Node, SNode>::twoNodeArraysWorker( 
@@ -1859,10 +1875,6 @@ void Voxelizer<Node, SNode>::twoNodeArraysWorker(
     if ( !this->options.slices )
         this->deallocateVoxelizationData( device );
 
-    // Quit now if only producing a plain voxelization.
-    if (!this->options.nodeOutput)
-        return;
-
     // Using the entire array now, so allocPartition is the right bounding 
     // box to use. Split it into smaller spaces according to the maximum size 
     // demands and process the individual spaces sequentially, just like in 
@@ -1882,8 +1894,9 @@ void Voxelizer<Node, SNode>::twoNodeArraysWorker(
 
     device.nodes_gpu.zero();
 
-    // New stuff goes here!
-
+    // Perform a specialized surface voxelization that sets each node, that is 
+    // part of the surface voxelization, to one. This is done to identify the 
+    // surface nodes.
     {
         // Classifies triangles according to their bounding boxes. This makes 
         // it possible to group similar triangles together to increase 
@@ -1919,7 +1932,7 @@ void Voxelizer<Node, SNode>::twoNodeArraysWorker(
                 , device.nodes_gpu.get()
                 , splits.splits[i]
                 , 1
-                , true
+                , true // This enables the marking of surface nodes.
                 , device.surfNodes_gpu.get()
                 , this->startTime
                 , this->options.verbose );
@@ -1937,6 +1950,8 @@ void Voxelizer<Node, SNode>::twoNodeArraysWorker(
         }
     }
 
+    // Use thrust to count the number of nodes that were earlier marked as 
+    // being surface nodes.
     calcSurfNodeCount( device.data
                      , device.nodes_gpu.get()
                      , this->startTime
@@ -1946,8 +1961,9 @@ void Voxelizer<Node, SNode>::twoNodeArraysWorker(
         std::cout << "Number of surface nodes: " << 
                      device.data.nrOfSurfaceNodes << "\n";
 
-    // Allocate Surface node array and HashMap.
-
+    // Allocate Surface node array and HashMap. Having the HashMap be twice 
+    // as large as the data it should contain is a pretty good value that 
+    // results in relatively few collisions.
     device.data.hashMap = HashMap( 2 * device.data.nrOfSurfaceNodes );
     device.data.hashMap.allocate();
 
@@ -1955,6 +1971,10 @@ void Voxelizer<Node, SNode>::twoNodeArraysWorker(
                               , device.data.dev );
     device.surfNodes_gpu.zero();
 
+    // Read the node array and calculate an index into the surface node array 
+    // for each regular node that was earlier marked as being part of the 
+    // surface. Essentially fills the HashMap with mappings from regular node 
+    // indices to surface node indices.
     populateHashMap( device.data
                    , device.nodes_gpu.get()
                    , this->startTime
@@ -1962,6 +1982,8 @@ void Voxelizer<Node, SNode>::twoNodeArraysWorker(
 
     // Perform a simple translation from the integer representation to a Node 
     // representation. No materials or neighborhoods are calculated yet.
+    // Essentially complements the earlier surface node data with the data 
+    // from the plain voxelization.
     for ( uint i = 0; i < allocYzSplits.counts.x * allocYzSplits.counts.y; ++i )
     {
         calcNodeList( device.data,
@@ -1972,7 +1994,9 @@ void Voxelizer<Node, SNode>::twoNodeArraysWorker(
                       this->options.verbose );
     }
 
-    // Calculate materials.
+    // Calculate materials and also perform the cutting algorithm to determine 
+    // the inner volume of the voxel, as well as the partial areas of the sides 
+    // of the voxel that connect solid voxels together.
     {
         // Yet another subdivision. Since the surface voxelizer functions in 
         // all three dimensions, instead of just two like in the plain 
@@ -2014,11 +2038,6 @@ void Voxelizer<Node, SNode>::twoNodeArraysWorker(
 #endif
         }
     }
-
-    // TODO: Testing of all the features.
-    //
-    // Test plan: Each subcomponent should be tested separately to ensure that 
-    //            there are no surprises later on.
     
     // If slicing along the x-direction, undo the rotation of the model.
     if ( this->options.slices && this->options.sliceDirection == 0 ) {
@@ -2059,7 +2078,14 @@ void Voxelizer<Node, SNode>::twoNodeArraysWorker(
     }
     
     // Calculate orientations. The algorithm should repeatedly call 
-    // procNodeList while the error_gpu is true.
+    // procNodeList while the error_gpu is true. If the algorithm consumes too 
+    // many surface nodes, then the nodes with surface bids will start to have 
+    // no matching surface nodes. This is identical to the case with other 
+    // node types (including this one) where nodes are destroyed in 
+    // sufficiently large numbers to move the surface to cover nodes with no 
+    // material ids set. There is no built-in mechanism to detect these cases.
+    // Usually the surface nodes produce a thick enough layer that the deletion 
+    // of a few will not cause any loss of important data.
     for ( uint i = 0
         ; i < allocYzSplits.counts.x * allocYzSplits.counts.y
         ; ++i )
@@ -3972,7 +3998,14 @@ std::vector<NodePointer<Node> > Voxelizer<Node, SNode>::collectData()
 
     return result;
 }
-
+///////////////////////////////////////////////////////////////////////////////
+/// Calls collectData(NodePointer) for each device used during the 
+/// voxelization. It returns NodePointer objects filled with the data of one 
+/// device, which are then added to the vector object. This function is meant 
+/// to be used with the voxelizations involving two arrays.
+///
+/// \return vector of \p Node2APointer that contains data from all devices.
+///////////////////////////////////////////////////////////////////////////////
 template <class Node, class SNode>
 std::vector<Node2APointer<Node, SNode> > 
     Voxelizer<Node, SNode>::collectSurfData()
@@ -4068,7 +4101,21 @@ NodePointer<Node> Voxelizer<Node, SNode>::collectData
 
     return result;
 }
-
+///////////////////////////////////////////////////////////////////////////////
+/// Takes into account the unique characteristics of every different output 
+/// type. Usually called by collectData(vector<NodePointer>) as it cycles 
+/// through the devices used during the voxelization. When voxelizing directly 
+/// to device pointers, the vector argumented version should be used. When 
+/// voxelizing directly to host pointers, this version should be used. This 
+/// function is meant to be used when voxelizing to two arrays.
+/// 
+/// \throws Exception if CUDA reports an error.
+///
+/// \param[in,out] device Which device is being used.
+/// \param[in] hostPointers \p true if a host pointer should be produced.
+///
+/// \return \p Node2APointer that contains the data of a particular device.
+///////////////////////////////////////////////////////////////////////////////
 template <class Node, class SNode>
 Node2APointer<Node, SNode> Voxelizer<Node, SNode>::collectSurfData
     ( DevContext<Node,SNode> & device
@@ -4156,7 +4203,30 @@ std::vector<NodePointer<Node> > Voxelizer<Node, SNode>::simulateMultidevice
     return func();
 }
 ///////////////////////////////////////////////////////////////////////////////
+/// The voxelization produced by this function is a standard voxelization 
+/// (ie. not using an FCC grid) that in addition includes a lot of data about 
+/// the intersections between the triangles and the surface voxels. When a 
+/// triangle intersects a voxel, the areas and volumes of the voxel are cut 
+/// and they can be classified as being inside or outside of the model. These 
+/// inner volumes and areas of the voxel's sides are available in each surface 
+/// node. In order to handle this large amount of data, the surface voxels had 
+/// to be split into separate voxel types. There are, as a result, now two 
+/// arrays of nodes: one for the solid voxelization, and one for the surface 
+/// voxels. The surface voxels are accessed by retrieving their index from a 
+/// hash map, by using the index of a solid node as a key.
 ///
+/// \throws Exception if CUDA reports an error.
+///
+/// \param[in] cubeLength Distance between voxel centers, or the length of 
+///                       each side of a voxel.
+/// \param[in] devConfig Device configuration for multi-device processing.
+/// \param[in] voxSplitRes Maximum processable volume for the calculation of 
+///                        the plain voxelization.
+/// \param[in] matSplitRes Maximum processable volume for the materials
+///                        calculations.
+///
+/// \return A vector of \p Node2APointer that contains both node arrays, the 
+///         hash map and additional information needed to use them.
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node, class SNode>
 std::vector<Node2APointer<Node, SNode> >
@@ -4182,7 +4252,30 @@ std::vector<Node2APointer<Node, SNode> >
     return result;
 }
 ///////////////////////////////////////////////////////////////////////////////
+/// The voxelization produced by this function is a standard voxelization 
+/// (ie. not using an FCC grid) that in addition includes a lot of data about 
+/// the intersections between the triangles and the surface voxels. When a 
+/// triangle intersects a voxel, the areas and volumes of the voxel are cut 
+/// and they can be classified as being inside or outside of the model. These 
+/// inner volumes and areas of the voxel's sides are available in each surface 
+/// node. In order to handle this large amount of data, the surface voxels had 
+/// to be split into separate voxel types. There are, as a result, now two 
+/// arrays of nodes: one for the solid voxelization, and one for the surface 
+/// voxels. The surface voxels are accessed by retrieving their index from a 
+/// hash map, by using the index of a solid node as a key.
 ///
+/// \throws Exception if CUDA reports an error.
+///
+/// \param[in] maxDimension How many voxels should there be along the longest
+///                         side of the model.
+/// \param[in] devConfig Device configuration for multi-device processing.
+/// \param[in] voxSplitRes Maximum processable volume for the calculation of 
+///                        the plain voxelization.
+/// \param[in] matSplitRes Maximum processable volume for the materials
+///                        calculations.
+///
+/// \return A vector of \p Node2APointer that contains both node arrays, the 
+///         hash map and additional information needed to use them.
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node, class SNode>
 std::vector<Node2APointer<Node, SNode> >
@@ -4208,7 +4301,31 @@ std::vector<Node2APointer<Node, SNode> >
     return result;
 }
 ///////////////////////////////////////////////////////////////////////////////
+/// The voxelization produced by this function is a standard voxelization 
+/// (ie. not using an FCC grid) that in addition includes a lot of data about 
+/// the intersections between the triangles and the surface voxels. When a 
+/// triangle intersects a voxel, the areas and volumes of the voxel are cut 
+/// and they can be classified as being inside or outside of the model. These 
+/// inner volumes and areas of the voxel's sides are available in each surface 
+/// node. In order to handle this large amount of data, the surface voxels had 
+/// to be split into separate voxel types. There are, as a result, now two 
+/// arrays of nodes: one for the solid voxelization, and one for the surface 
+/// voxels. The surface voxels are accessed by retrieving their index from a 
+/// hash map, by using the index of a solid node as a key. This function 
+/// returns pointers to host memory.
 ///
+/// \throws Exception if CUDA reports an error.
+///
+/// \param[in] cubeLength Distance between voxel centers, or the length of 
+///                       each side of a voxel.
+/// \param[in] devConfig Device configuration for multi-device processing.
+/// \param[in] voxSplitRes Maximum processable volume for the calculation of 
+///                        the plain voxelization.
+/// \param[in] matSplitRes Maximum processable volume for the materials
+///                        calculations.
+///
+/// \return A \p Node2APointer that contains both node arrays, the hash map and 
+///         additional information needed to use them.
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node, class SNode>
 Node2APointer<Node, SNode>
@@ -4233,7 +4350,31 @@ Node2APointer<Node, SNode>
     return result;
 }
 ///////////////////////////////////////////////////////////////////////////////
+/// The voxelization produced by this function is a standard voxelization 
+/// (ie. not using an FCC grid) that in addition includes a lot of data about 
+/// the intersections between the triangles and the surface voxels. When a 
+/// triangle intersects a voxel, the areas and volumes of the voxel are cut 
+/// and they can be classified as being inside or outside of the model. These 
+/// inner volumes and areas of the voxel's sides are available in each surface 
+/// node. In order to handle this large amount of data, the surface voxels had 
+/// to be split into separate voxel types. There are, as a result, now two 
+/// arrays of nodes: one for the solid voxelization, and one for the surface 
+/// voxels. The surface voxels are accessed by retrieving their index from a 
+/// hash map, by using the index of a solid node as a key. This function 
+/// returns pointers to host memory.
 ///
+/// \throws Exception if CUDA reports an error.
+///
+/// \param[in] maxDimension How many voxels should there be along the longest
+///                         side of the model.
+/// \param[in] devConfig Device configuration for multi-device processing.
+/// \param[in] voxSplitRes Maximum processable volume for the calculation of 
+///                        the plain voxelization.
+/// \param[in] matSplitRes Maximum processable volume for the materials
+///                        calculations.
+///
+/// \return A \p Node2APointer that contains both node arrays, the hash map and 
+///         additional information needed to use them.
 ///////////////////////////////////////////////////////////////////////////////
 template <class Node, class SNode>
 Node2APointer<Node, SNode>
@@ -4257,6 +4398,7 @@ Node2APointer<Node, SNode>
     return result;
 }
 
+// Template instantiations to force the compiler to compile them.
 template class Voxelizer<ShortNode>;
 template class Voxelizer<LongNode>;
 template class Voxelizer<PartialNode>;

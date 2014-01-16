@@ -170,16 +170,16 @@ struct is_BB
     }
 };
 ///////////////////////////////////////////////////////////////////////////////
+/// \brief Functor that tests if a bid equals the given number.
 ///
+/// \tparam T Type of node.
+/// \tparam I Integer to test against.
 ///////////////////////////////////////////////////////////////////////////////
 template <class T, int I>
 struct NodeBidEquals
 {
-    //neq_x( T value ): x(value) {}
-
+    /// Returns true if c.bid() equals I.
     __host__ __device__ bool operator()( const T & c ) { return c.bid() == I; }
-
-    //T x;
 };
 ///////////////////////////////////////////////////////////////////////////////
 /// \brief Exception class used by the Voxelizer. 
@@ -232,7 +232,11 @@ inline void checkCudaErrors( std::string loc )
     }
 }
 ///////////////////////////////////////////////////////////////////////////////
+/// \brief A list of primes to be used with the hash map. 
 ///
+/// Not really used anywhere at the moment, but it could be used to change 
+/// the prime used in the hash function in case there are too many collisions 
+/// with the current one.
 ///////////////////////////////////////////////////////////////////////////////
 const uint primeList[204] = {
     970194959, 970194983, 970194989, 970195021, 970195073, 970195123, 
@@ -272,14 +276,32 @@ const uint primeList[204] = {
 };
 
 ///////////////////////////////////////////////////////////////////////////////
+/// \brief CUDA hash map implementation for (uint,uint)-mappings.
 ///
+/// This is a hash map with a simple hash function that can map between 32-bit
+/// unsigned integers. It stores (key,value)-pairs as 64-bit unsigned integers 
+/// in a table. It needs to be manually allocated and deallocated from the 
+/// host side prior to use, but after that it can be inserted into and applied 
+/// on the device.
 ///////////////////////////////////////////////////////////////////////////////
 class HashMap
 {
 public:
+    /// Default constructor.
     __host__ __device__
     HashMap() {}
-
+    ///////////////////////////////////////////////////////////////////////////
+    /// \brief Proper constructor for initializing the hash map.
+    ///
+    /// The hash map only needs three arguments to initialize: The size of the 
+    /// hash map (which is recommended to be set to twice the intended amount 
+    /// of elements), the maximum number of reshash attempts on collisions 
+    /// before giving up, and a large prime number for the hash function.
+    ///
+    /// \param[in] size Size of the hash maps array.
+    /// \param[in] maxProbes Max number of collisions allowed.
+    /// \param[in] p A large prime number for the hash function.
+    ///////////////////////////////////////////////////////////////////////////
     __host__ __device__
     HashMap( uint size
            , int maxProbes = 100
@@ -288,17 +310,29 @@ public:
              , size(size)
              , p(p)
              , maxProbes(maxProbes) {}
-
+    /// Copy constructor.
     __host__ __device__
     HashMap( const HashMap & other ): size(other.size)
                                     , maxProbes(other.maxProbes)
                                     , p(other.p)
                                     , table(other.table) {}
-
+    /// Default destructor.
     __host__ __device__
     ~HashMap() {}
 
 #ifdef __CUDACC__
+    ///////////////////////////////////////////////////////////////////////////
+    /// \brief Insert a pair into the hash map.
+    ///
+    /// Attempts to insert a pair into the hash map \p maxProbes times, using 
+    /// a different hash each time a collision occurs. If none of the attempts 
+    /// succeed, returns false. Returns true on a successful insertion.
+    ///
+    /// \param[in] id Key to insert with.
+    /// \param[in] value Value to insert to the given key.
+    ///
+    /// \return \p true if insertion succeeded, \p false otherwise.
+    ///////////////////////////////////////////////////////////////////////////
     __device__
     bool insert( uint32_t id, uint32_t value )
     {
@@ -306,6 +340,8 @@ public:
         {
             uint32_t hashCode = hash( id, attempt );
             
+            // Insert with an atomic compare and swap to make it parallel-
+            // friendly.
             uint64_t old = 
                 atomicCAS( &table[hashCode]
                          , HashMap::EMPTY
@@ -320,7 +356,18 @@ public:
         return false;
     }
 #endif
-
+    ///////////////////////////////////////////////////////////////////////////
+    /// \brief Host version of the insertion function.
+    ///
+    /// Needs to have the hash table allocated on host memory for it to work.
+    /// Returns the number of collisions before success (or at failure) for 
+    /// debugging purposes.
+    ///
+    /// \param[in] id Key to insert with.
+    /// \param[in] value Value to insert to the given key.
+    ///
+    /// \return number of collisions before returning.
+    ///////////////////////////////////////////////////////////////////////////
     __host__
     uint insertHost( uint32_t id, uint32_t value )
     {
@@ -340,7 +387,14 @@ public:
         }
         return collisions;
     }
-
+    ///////////////////////////////////////////////////////////////////////////
+    /// \brief Retrieves the value associated with the given key.
+    ///
+    /// \param[in] id The key to look with.
+    ///
+    /// \return The value that was associated with the given key, or 
+    ///         \p UINT32_MAX if the key could not be found.
+    ///////////////////////////////////////////////////////////////////////////
     __host__ __device__
     uint32_t get( uint32_t id )
     {
@@ -357,20 +411,20 @@ public:
 
         return UINT32_MAX;
     }
-
+    /// Renews the prime number used in the hash function.
     __host__
     void renewHashPrime()
     {
         p = primeList[(p*p) % 204];
     }
-
+    /// Allocates memory for the hash table on the device.
     __host__
     void allocate()
     {
         cudaMalloc( &table, sizeof(uint64_t)*size );
         cudaMemset( table, UINT32_MAX, sizeof(uint64_t)*size );
     }
-
+    /// Allocates memory for the hash table on host memory.
     __host__
     void allocateHost()
     {
@@ -378,19 +432,19 @@ public:
         for ( uint i = 0; i < size; ++i )
             table[i] = HashMap::EMPTY;
     }
-
+    /// Frees the allocated memory on the device.
     __host__
     void deallocate()
     {
         cudaFree( table );
     }
-
+    /// Frees the allocated memory on host memory.
     __host__
     void deallocateHost()
     {
         delete[] table;
     }
-
+    /// Clears the hash map, but only for host memory.
     __host__
     void clearHost()
     {
@@ -399,7 +453,7 @@ public:
             table[i] = HashMap::EMPTY;
         }
     }
-
+    /// Converts a hash map on device memory to host memory.
     __host__
     void convertToHostMemory()
     {
@@ -409,13 +463,26 @@ public:
         cudaFree( devPtr );
     }
 
-    static const uint64_t EMPTY = UINT64_MAX;
+    static const uint64_t EMPTY = UINT64_MAX;   ///< Empty table entry.
 
 private:
-    uint64_t * table;
-    uint32_t size, p;
-    int maxProbes;
+    uint64_t * table;   ///< Table of (key,value)-pairs.
+    uint32_t size;      ///< Size of the table.
+    uint32_t p;         ///< Current prime number.
+    int maxProbes;      ///< Maximum tries before giving up.
 
+    ///////////////////////////////////////////////////////////////////////////
+    /// \brief The hash function
+    ///
+    /// Creates a hash by multiplying the key with a large prime and adding 
+    /// the square of the current attempt to the result, and then taking the 
+    /// modulo of the size of the table.
+    ///
+    /// \param[in] id Key.
+    /// \param[in] attempt Current attempt.
+    ///
+    /// \return A hash code.
+    ///////////////////////////////////////////////////////////////////////////
     __host__ __device__
     uint32_t hash( uint32_t id, uint32_t attempt )
     {

@@ -653,7 +653,7 @@
 namespace vox {
 
 ///////////////////////////////////////////////////////////////////////////////
-/// \brief Result type of all voxelization operations. 
+/// \brief Result type of most voxelization operations. 
 /// 
 /// Functions that advertise to return device pointers return a vector of \p 
 /// NodePointer structs, one for each device used in the voxelization. 
@@ -683,7 +683,16 @@ struct NodePointer {
     uint3 loc;          ///< Location of the \p Node grid.
 };
 ///////////////////////////////////////////////////////////////////////////////
+/// \brief Result type of voxelization operations with two arrays.
 ///
+/// Analogous to \p NodePointer. This one contains two arrays of different 
+/// \p Node types -- one for solid nodes and another for surface nodes. The 
+/// surface nodes are accessed through a hash map, which maps solid node 
+/// indices to surface node indices.
+///
+/// \tparam VolumeNode Type of node to use for the vast majority of nodes, ie. 
+///                    the solid nodes.
+/// \tparam SurfaceNode Type of node to use for the surface voxels.
 ///////////////////////////////////////////////////////////////////////////////
 template <class VolumeNode, class SurfaceNode>
 struct Node2APointer {
@@ -806,7 +815,7 @@ public:
                           , uint  slice
                           , uint2 voxSplitRes = make_uint2( 1024, 512 )
                           , uint2 matSplitRes = make_uint2( 512, 512 ) );
-
+    /// Voxelizes with large surface nodes.
     std::vector<Node2APointer<Node, SNode> >
         voxelizeToSurfaceNodes( 
             double cubeLength, 
@@ -814,7 +823,7 @@ public:
             uint3 voxSplitRes = make_uint3( 1024, 512, 512 ), 
             uint3 matSplitRes = make_uint3( 512, 512, 512 )
         );
-
+    /// Voxelizes with large surface nodes.
     std::vector<Node2APointer<Node, SNode> >
         voxelizeToSurfaceNodes( 
             uint maxDimension, 
@@ -822,14 +831,14 @@ public:
             uint3 voxSplitRes = make_uint3( 1024, 512, 512 ), 
             uint3 matSplitRes = make_uint3( 512, 512, 512 )
         );
-
+    /// Voxelizes with large surface nodes, returning host pointers.
     Node2APointer<Node, SNode>
         voxelizeToSurfaceNodesToRAM( 
             double cubeLength, 
             uint3 voxSplitRes = make_uint3( 1024, 512, 512 ), 
             uint3 matSplitRes = make_uint3( 512, 512, 512 )
         );
-
+    /// Voxelizes with large surface nodes, returning host pointers.
     Node2APointer<Node, SNode>
         voxelizeToSurfaceNodesToRAM( 
             uint maxDimension, 
@@ -1020,7 +1029,7 @@ private:
                          uint3 voxSplitRes,
                          uint3 matSplitRes,
                          DevContext<Node,SNode> & device );
-    ///
+    /// Specialized worker function for voxelizations with two arrays.
     void twoNodeArraysWorker( uint  xRes
                             , uint  xSplits
                             , uint3 voxSplitRes
@@ -1048,7 +1057,9 @@ private:
     /// Constructs the \p NodePointer returnable.
     NodePointer<Node> collectData( DevContext<Node,SNode> & device
                                  , const bool hostPointers );
+    /// Constructs the <tt>vector<Node2APointer></tt> returnable.
     std::vector<Node2APointer<Node, SNode> > collectSurfData();
+    /// Constructs the \p Node2APointer returnable.
     Node2APointer<Node, SNode> collectSurfData( DevContext<Node,SNode> & device
                                               , const bool         hostPointers
                                               );

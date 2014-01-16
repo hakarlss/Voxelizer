@@ -52,8 +52,8 @@ template <class Node>
 void testMaterialsLoop(Node const * nodes, float const * vertices, uint const * indices, uint nrOfTriangles, uint3 resolution, float voxelLength);
 std::pair<std::unique_ptr<float[]>, std::unique_ptr<uint[]> > loadModel(vtkSmartPointer<vtkPolyData> & model, uint &nrOfVertices, uint &nrOfTriangles);
 void testCrossproduct();
-template <class Node>
-uint numberOfNodesWithNoMaterial(Node* nodes, uint3 resolution);
+template <class Node, class SNode>
+uint numberOfNodesWithNoMaterial(Node* nodes, SNode* surfNodes, vox::HashMap & hashMap, uint3 resolution);
 void testTrianglePlaneIntersection();
 template <class Node>
 void analyzeRatioNodes(Node* nodes, uint3 resolution, float voxelLength, int nthErroneousRatio);
@@ -682,10 +682,10 @@ void renderSurfNodeOutput( Node * nodes
             continue;
         */
         
-        /*
+        
         if ( surfNode.volume == 0.0f )
             continue;
-        */
+        
 
         uint x = nodeIdx % res.x;
         uint y = (nodeIdx % (res.x * res.y)) / res.x;
@@ -1030,8 +1030,11 @@ void testCrossproduct()
     cout << "X: " << n5.x << ", Y: " << n5.y << ", Z: " << n5.z << ".\n";
 }
 
-template <class Node>
-uint numberOfNodesWithNoMaterial(Node* nodes, uint3 resolution)
+template <class Node, class SNode>
+uint numberOfNodesWithNoMaterial( Node* nodes
+                                , SNode* surfNodes
+                                , vox::HashMap & hashMap
+                                , uint3 resolution )
 {
     uint count = 0;
     Node node;
@@ -1043,15 +1046,36 @@ uint numberOfNodesWithNoMaterial(Node* nodes, uint3 resolution)
         {
             if ( node.bid() == 0 || node.bid() == 4095 )
                 continue;
+
+            if ( node.mat() == 0 )
+                count++;
+        }
+        else if ( Node::usesTwoArrays() )
+        {
+            if ( node.bid() == 0 || node.bid() == 27 )
+                continue;
+
+            uint surfIdx = hashMap.get( i );
+
+            if ( surfIdx == UINT32_MAX )
+            {
+                count++;
+                continue;
+            }
+
+            SNode surfNode = surfNodes[surfIdx];
+
+            if ( surfNode.material == 0 )
+                count++;
         }
         else
         {
             if ( node.bid() == 0 || node.bid() == 27 )
                 continue;
-        }
 
-        if ( node.mat() == 0 )
-            count++;
+            if ( node.mat() == 0 )
+                count++;
+        }
     }
     return count;
 }
@@ -1765,7 +1789,7 @@ void performSliceTest
 
     if ( vm.count( "materials" ) )
     {
-        uint badNodes = numberOfNodesWithNoMaterial( result.ptr, result.dim );
+        uint badNodes = numberOfNodesWithNoMaterial( result.ptr, (vox::SurfaceNode*)NULL, vox::HashMap(), result.dim );
         std::cout << "Found " << badNodes << " boundary nodes with no material"
             "\n";
     }
@@ -1867,7 +1891,7 @@ void performNodeTest
 
     if ( vm.count( "materials" ) )
     {
-        uint badNodes = numberOfNodesWithNoMaterial( nodes.get(), res );
+        uint badNodes = numberOfNodesWithNoMaterial( nodes.get(), (vox::SurfaceNode*)NULL, vox::HashMap(), res );
         std::cout << "Found " << badNodes << " boundary nodes with no material"
             "\n";
     }
@@ -2006,15 +2030,17 @@ void performTwoArrayTest
     std::cout << "Nr of matching nodes found: " << nrOfMatches << "\n";
     std::cout << "Largest continuous index: " << prevIdx << "\n";
 
-    /*
+    
     if ( vm.count( "materials" ) )
     {
         uint badNodes = numberOfNodesWithNoMaterial( result[0].nodes
+                                                   , result[0].surfNodes
+                                                   , result[0].indices
                                                    , result[0].dim );
         std::cout << "Found " << badNodes << " boundary nodes with no material"
             "\n";
     }
-    */
+    
 
     analyzeSurfaceNodes( result[0].nodes
                        , result[0].surfNodes
@@ -2141,7 +2167,7 @@ void performAllSliceTest
 
     if ( vm.count( "materials" ) )
     {
-        uint badNodes = numberOfNodesWithNoMaterial( nodes, res );
+        uint badNodes = numberOfNodesWithNoMaterial( nodes, (vox::SurfaceNode*)NULL, vox::HashMap(), res );
         std::cout << "Found " << badNodes << " boundary nodes with no material"
             "\n";
     }
