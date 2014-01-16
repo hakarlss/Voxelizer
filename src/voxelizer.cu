@@ -128,7 +128,7 @@ void calcSurfNodeCount
 
     uint count = thrust::count_if( nDevPtr
                                  , nDevPtr + devData.nrOfNodes
-                                 , neq_0<Node>() );
+                                 , NodeBidEquals<Node, 1>() );
 
     devData.nrOfSurfaceNodes = count;
 
@@ -1756,7 +1756,7 @@ __global__ void constructNodeList2
 
         nodeIdx = res.x * res.y * z + res.x * y + VOX_BPI * x + bit;
 
-        nodes[nodeIdx] = node;
+        if ( node.bid() != 0 ) nodes[nodeIdx] = node;
     }
 }
 ///////////////////////////////////////////////////////////////////////////////
@@ -3058,9 +3058,9 @@ inline __device__ void processVoxel
 {
     uint nodeIdx = 0;
 
-    uint x = coords.x + adjs.x;
-    uint y = coords.y + adjs.y;
-    uint z = coords.z + adjs.z;
+    const uint x = coords.x + adjs.x;
+    const uint y = coords.y + adjs.y;
+    const uint z = coords.z + adjs.z;
 
     if ( Node::isFCCNode() )
     {   // The node is to be written into a FCC grid.
@@ -5855,7 +5855,7 @@ __global__ void fillHashMap
 
         if ( n < maxNodeIdx )
         {
-            const uint nodeType = nodes[n].bid(); 
+            const uint nodeType = uint(nodes[n].bid()); 
             const uint ballot = __ballot( nodeType );
 
             if ( ballot == 0u )

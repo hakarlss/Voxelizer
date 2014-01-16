@@ -172,12 +172,12 @@ struct is_BB
 ///////////////////////////////////////////////////////////////////////////////
 ///
 ///////////////////////////////////////////////////////////////////////////////
-template <class T>
-struct neq_0
+template <class T, int I>
+struct NodeBidEquals
 {
     //neq_x( T value ): x(value) {}
 
-    __host__ __device__ bool operator()( const T & c ) { return c.bid() != 0; }
+    __host__ __device__ bool operator()( const T & c ) { return c.bid() == I; }
 
     //T x;
 };
@@ -290,20 +290,26 @@ public:
              , maxProbes(maxProbes) {}
 
     __host__ __device__
+    HashMap( const HashMap & other ): size(other.size)
+                                    , maxProbes(other.maxProbes)
+                                    , p(other.p)
+                                    , table(other.table) {}
+
+    __host__ __device__
     ~HashMap() {}
 
 #ifdef __CUDACC__
     __device__
-    bool insert( uint id, uint32_t value )
+    bool insert( uint32_t id, uint32_t value )
     {
         for ( int attempt = 1; attempt < maxProbes; ++attempt )
         {
-            uint hashCode = hash( id, attempt );
+            uint32_t hashCode = hash( id, attempt );
             
             uint64_t old = 
                 atomicCAS( &table[hashCode]
                          , HashMap::EMPTY
-                         , uint64_t(id) << 32 | uint64_t(value) 
+                         , (uint64_t(id) << 32) | uint64_t(value) 
                          );
 
             if ( old == HashMap::EMPTY )
@@ -316,18 +322,18 @@ public:
 #endif
 
     __host__
-    uint insertHost( uint id, uint32_t value )
+    uint insertHost( uint32_t id, uint32_t value )
     {
         uint collisions = 0;
         for ( int attempt = 1; attempt < maxProbes; ++attempt )
         {
-            uint hashCode = hash( id, attempt );
+            uint32_t hashCode = hash( id, attempt );
             
             uint64_t old = table[hashCode];
 
             if ( old == HashMap::EMPTY )
             {
-                table[hashCode] = uint64_t(id) << 32 | uint64_t(value);
+                table[hashCode] = (uint64_t(id) << 32) | uint64_t(value);
                 return collisions;
             }
             collisions++;
@@ -336,17 +342,17 @@ public:
     }
 
     __host__ __device__
-    uint32_t get( uint id )
+    uint32_t get( uint32_t id )
     {
         for ( int attempt = 1; attempt < maxProbes; ++attempt )
         {
-            uint hashCode = hash( id, attempt );
+            uint32_t hashCode = hash( id, attempt );
 
             uint64_t item = table[hashCode];
             if ( item == HashMap::EMPTY )
                 return UINT32_MAX;
             else if ( uint32_t(item >> 32) == id )
-                return uint32_t(item & UINT64_MAX >> 32);
+                return uint32_t(item & (UINT64_MAX >> 32));
         }
 
         return UINT32_MAX;
@@ -407,11 +413,11 @@ public:
 
 private:
     uint64_t * table;
-    uint size, p;
+    uint32_t size, p;
     int maxProbes;
 
     __host__ __device__
-    uint hash( uint id, uint attempt )
+    uint32_t hash( uint32_t id, uint32_t attempt )
     {
         return (id*p + attempt*attempt) % size;
     }

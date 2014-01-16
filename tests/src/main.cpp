@@ -654,14 +654,13 @@ void renderSurfNodeOutput( Node * nodes
         
         // Ignore non-solid nodes.
         
-        /*
+        
         if (nodes[nodeIdx].bid() == 0)
             continue;
 
         // Ignore air nodes.
         if (nodes[nodeIdx].bid() == 27)
             continue;
-        */
 
         uint surfNodeIdx = hashMap.get( nodeIdx );
         
@@ -671,14 +670,12 @@ void renderSurfNodeOutput( Node * nodes
         SNode surfNode = surfNodes[surfNodeIdx];
         
         
-        /*
         if (materials)
         {
             // Ignore nodes with zero material.
             if (surfNode.material == 0)
                 continue;
         }
-        */
 
         /*
         if ( surfNode.orientation == 0 || surfNode.orientation == 27 )
@@ -696,13 +693,11 @@ void renderSurfNodeOutput( Node * nodes
 
         points->InsertNextPoint(double(x), double(y), double(z));
         
-        /*
+        
         if (materials)
             colors->InsertNextTupleValue(colorList[surfNode.material]);
         else
-        */
-        
-        colors->InsertNextTupleValue(white);
+            colors->InsertNextTupleValue(white);
     }
 
     vtkSmartPointer<vtkPolyData> data = vtkSmartPointer<vtkPolyData>::New();
