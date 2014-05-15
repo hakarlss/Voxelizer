@@ -8,7 +8,7 @@
 #if defined(unix) || defined(__unix__) || defined(__unix)
 #include <tr1/cstdint>
 #else
-#include <cstdint>
+#include <stdint.h>
 #endif
 
 #include <cuda.h>
