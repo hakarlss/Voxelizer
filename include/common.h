@@ -343,9 +343,9 @@ public:
             // Insert with an atomic compare and swap to make it parallel-
             // friendly.
             uint64_t old = 
-                atomicCAS( &table[hashCode]
-                         , HashMap::EMPTY
-                         , (uint64_t(id) << 32) | uint64_t(value) 
+                atomicCAS((unsigned long long int*) &table[hashCode]
+                         , (unsigned long long int)HashMap::EMPTY
+                         , (unsigned long long int)((uint64_t(id) << 32) | uint64_t(value)) 
                          );
 
             if ( old == HashMap::EMPTY )
