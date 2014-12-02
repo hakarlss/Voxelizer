@@ -26,7 +26,7 @@ set( Boost_USE_STATIC_RUNTIME OFF )
 set( Boost_NO_BOOST_CMAKE ON )
 
 # Require Boost >= 1.53 with system and thread components.
-find_package( Boost 1.53 REQUIRED COMPONENTS system thread chrono date_time )
+find_package( Boost 1.53 REQUIRED COMPONENTS system thread  date_time )
 
 # If boost cannot be found, make a cache variable that allows the user to 
 # specify the Boost root directory where the libraries and includes are found.
