@@ -6,11 +6,12 @@
 #define VOX_COMMON_H
 
 #if defined(unix) || defined(__unix__) || defined(__unix)
-#include <tr1/cstdint>
+#include <stdint.h>
 #else
-#include <cstdint>
+#include <stdint.h>
 #endif
 
+#include <limits>
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <sm_12_atomic_functions.h>
@@ -18,8 +19,10 @@
 #include <exception>
 #include <string>
 #include <iostream>
-
 #include <ctime>
+
+#define UINT32_MAX  ((uint32_t)-1)
+#define UINT64_MAX  ((uint64_t)-1)
 
 namespace vox
 {
