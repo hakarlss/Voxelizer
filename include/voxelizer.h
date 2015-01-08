@@ -905,8 +905,12 @@ public:
     }
     /// Define materials for the model.
     void setMaterials( uchar const * _materials, uint _nrOfUniqueMaterials );
-    /// Enables or disabeles material output.
+    /// Enables or disables material output.
     void setMaterialOutput( bool _materials ) throw();
+	/// Enables or disables orientations output.
+    void setOrientationsOutput( bool _orientations  ) throw();
+	/// Enables or disables center of voxel for comparison.
+    void setDisplace_VoxSpace_dX_2( bool _displace_VoxSpace_dX_2  ) throw();
     /// Enables or disables messages to the standard output stream.
     void verboseOutput( bool verbose ) throw();
     /// Calculates how large the \p Node array is going to be.

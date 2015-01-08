@@ -53,6 +53,12 @@ struct Options
     bool simulateMultidevice;  ///< \brief Simulates multiple devices on one 
                                ///<        device.
                                ///<
+    bool orientations;  	   ///< \brief Whether or not the default voxelization
+							   ///< worker calculates the orientations
+    bool displace_VoxSpace_dX_2;///< \brief Whether or not the triangle-voxel
+							   ///< comparison point is the center of the voxel
+							   ///< or the lower corner. This is achieved by
+							   ///< displacing the voxelization space by dX/2.
 };
 ///////////////////////////////////////////////////////////////////////////////
 /// \brief Exits the program, printing an error message if an error occurred.

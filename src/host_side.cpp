@@ -252,6 +252,31 @@ void Voxelizer<Node, SNode>::setMaterialOutput( bool _materials ) throw()
     this->options.materials = _materials;
 }
 ///////////////////////////////////////////////////////////////////////////////
+/// Explicitly enables or disables the calculation of orientations in the
+/// output of the voxelizer.
+///
+/// \param[in] _orientations \p true to enable orientations, \p false to disable
+/// them.
+///////////////////////////////////////////////////////////////////////////////
+template <class Node, class SNode>
+void Voxelizer<Node, SNode>::setOrientationsOutput( bool _orientations ) throw()
+{
+    this->options.orientations = _orientations;
+}
+///////////////////////////////////////////////////////////////////////////////
+/// Explicitly enables or disables the displacement of the comparison point to
+/// the center of the voxel. Otherwise, the lower corner of the voxel is used
+/// for comparison.
+///
+/// \param[in] _displace_VoxSpace_dX_2 \p true to use center of voxel, \p false
+/// to use the lower corner of the voxel.
+///////////////////////////////////////////////////////////////////////////////
+template <class Node, class SNode>
+void Voxelizer<Node, SNode>::setDisplace_VoxSpace_dX_2( bool _displace_VoxSpace_dX_2 ) throw()
+{
+    this->options.displace_VoxSpace_dX_2 = _displace_VoxSpace_dX_2;
+}
+///////////////////////////////////////////////////////////////////////////////
 /// Calculates the plain, integer voxelization given a \a subspace and some 
 /// other parameters. Relies on certain data structures being allocated and 
 /// certain values being calculated, so it cannot be called on its own, but is 
@@ -275,6 +300,13 @@ void Voxelizer<Node, SNode>::performVoxelization(
     uint				  nrOfXSlices,
     DevContext<Node,SNode>    & device )
 {
+	if (this->options.displace_VoxSpace_dX_2)
+	{
+		// Move space half a voxel so that intersection point is the center of the voxel:
+		double3 displace_ext_by = make_double3( 0.5 * this->hostVars.voxelLength, 0.5 * this->hostVars.voxelLength, 0.5 * this->hostVars.voxelLength);
+		device.data.extMinVertex += displace_ext_by;
+	}
+
     // Initialize values here, since the function may be called successively.
     device.data.workQueueSize = 0;
     device.data.firstTriangleWithTiles = -1;
@@ -951,8 +983,8 @@ void Voxelizer<Node, SNode>::voxelizeWorker(
     device.data.allocResolution = device.data.resolution;
 
     // Padding or extension.
-    device.data.allocResolution.max.y += 2;
-    device.data.allocResolution.max.z += 2;
+	device.data.allocResolution.max.y += 2;
+	device.data.allocResolution.max.z += 2;
 
     // Allocate memory, except when slices are enabled and the allocation
     // has already been performed.
@@ -1181,32 +1213,35 @@ void Voxelizer<Node, SNode>::voxelizeWorker(
     
     // Calculate orientations. The algorithm should repeatedly call 
     // procNodeList while the error_gpu is true.
-    for ( uint i = 0
-        ; i < allocYzSplits.counts.x * allocYzSplits.counts.y
-        ; ++i )
-    {
-        do
-        {
-            device.error = false;
+	if (this->options.orientations)
+	{
+		for ( uint i = 0
+			; i < allocYzSplits.counts.x * allocYzSplits.counts.y
+			; ++i )
+		{
+			do
+			{
+				device.error = false;
 
-            device.error_gpu.copyFrom( &device.error );
+				device.error_gpu.copyFrom( &device.error );
 
-            procNodeList( device.data
-                        , device.nodes_gpu.get()
-                        , device.nodesCopy_gpu.get()
-                        , device.error_gpu.get()
-                        , allocYzSplits.splits[i]
-                        , this->options.slices && 
-                          this->options.sliceDirection == 0
-                        , device.surfNodes_gpu.get()
-                        , this->startTime 
-                        , this->options.verbose );
+				procNodeList( device.data
+							, device.nodes_gpu.get()
+							, device.nodesCopy_gpu.get()
+							, device.error_gpu.get()
+							, allocYzSplits.splits[i]
+							, this->options.slices &&
+							  this->options.sliceDirection == 0
+							, device.surfNodes_gpu.get()
+							, this->startTime
+							, this->options.verbose );
 
-            device.error_gpu.copyTo( &device.error );
+				device.error_gpu.copyTo( &device.error );
 
-        } while ( device.error == true );
-    }
-    
+			} while ( device.error == true );
+		}
+	}
+
     // Zero the padding. Since part of the border may contain nodes that 
     // overlap with another subspace, the entire border needs to be set to 
     // zero, unless there are no neighboring subspaces.
