@@ -277,6 +277,16 @@ void Voxelizer<Node, SNode>::setDisplace_VoxSpace_dX_2( bool _displace_VoxSpace_
     this->options.displace_VoxSpace_dX_2 = _displace_VoxSpace_dX_2;
 }
 ///////////////////////////////////////////////////////////////////////////////
+/// Explicitly sets whether the dX/2 displacement already occurred.
+///
+/// \param[in] _is_displaced \p true if displacement occurred.
+///////////////////////////////////////////////////////////////////////////////
+template <class Node, class SNode>
+void Voxelizer<Node, SNode>::setIs_displaced( bool _is_displaced ) throw()
+{
+    this->options.is_displaced = _is_displaced;
+}
+///////////////////////////////////////////////////////////////////////////////
 /// Calculates the plain, integer voxelization given a \a subspace and some 
 /// other parameters. Relies on certain data structures being allocated and 
 /// certain values being calculated, so it cannot be called on its own, but is 
@@ -300,11 +310,12 @@ void Voxelizer<Node, SNode>::performVoxelization(
     uint				  nrOfXSlices,
     DevContext<Node,SNode>    & device )
 {
-	if (this->options.displace_VoxSpace_dX_2)
+	if (this->options.displace_VoxSpace_dX_2 && !this->options.is_displaced)
 	{
 		// Move space half a voxel so that intersection point is the center of the voxel:
 		double3 displace_ext_by = make_double3( 0.5 * this->hostVars.voxelLength, 0.5 * this->hostVars.voxelLength, 0.5 * this->hostVars.voxelLength);
 		device.data.extMinVertex += displace_ext_by;
+		this->options.is_displaced = true;
 	}
 
     // Initialize values here, since the function may be called successively.

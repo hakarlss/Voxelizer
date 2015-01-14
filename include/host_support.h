@@ -59,6 +59,10 @@ struct Options
 							   ///< comparison point is the center of the voxel
 							   ///< or the lower corner. This is achieved by
 							   ///< displacing the voxelization space by dX/2.
+	bool is_displaced;		   ///< \brief If the space has already been
+							   ///< incremented by dX/2. Avoids multiple dis-
+							   ///< splacements among sub-domains. Used only if
+							   ///< displace_VoxSpace_dX_2 is true.
 };
 ///////////////////////////////////////////////////////////////////////////////
 /// \brief Exits the program, printing an error message if an error occurred.

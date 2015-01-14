@@ -911,6 +911,8 @@ public:
     void setOrientationsOutput( bool _orientations  ) throw();
 	/// Enables or disables center of voxel for comparison.
     void setDisplace_VoxSpace_dX_2( bool _displace_VoxSpace_dX_2  ) throw();
+	/// Was the domain already displaced by dX_2...
+    void setIs_displaced( bool _is_displaced  ) throw();
     /// Enables or disables messages to the standard output stream.
     void verboseOutput( bool verbose ) throw();
     /// Calculates how large the \p Node array is going to be.
