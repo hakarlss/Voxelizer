@@ -6,7 +6,9 @@
 #include <vtkSmartPointer.h>
 #include <vtkRenderWindowInteractor.h>
 #include <vtkPolyDataReader.h>
+#include <vtkSTLReader.h>
 #include <vtkPLYReader.h>
+#include <vtkOBJReader.h>
 #include <vtkProperty.h>
 
 #include <vtkQuad.h>
@@ -383,11 +385,28 @@ int main(int argc, char** argv)
             reader->Update();
             polys = reader->GetOutput();
         }
+		if (file.rfind( ".stl") != std::string::npos)
+		{
+			vtkSmartPointer<vtkSTLReader> reader =
+				vtkSmartPointer<vtkSTLReader>::New();
+			reader->SetFileName(file.c_str());
+			reader->Update();
+			polys = reader->GetOutput();
+		}
+		if (file.rfind(".obj") != std::string::npos)
+		{
+			vtkSmartPointer<vtkOBJReader> reader =
+				vtkSmartPointer<vtkOBJReader>::New();
+			reader->SetFileName(file.c_str());
+			reader->Update();
+			polys = reader->GetOutput();
+		}
     }
 
     if ( polys.GetPointer() == NULL )
     {
         std::cout << "Invalid filename given" << std::endl;
+		return -1;
     }
 
     // Fail if bad model data was received.
@@ -491,7 +510,7 @@ void visualize(vtkPolyData* data, double3 minVertex, double3 maxVertex, double d
     data->SetLines(lines);
 
     vtkSmartPointer<vtkPolyDataMapper> mapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-    mapper->SetInput(data);
+    mapper->SetInputData(data);
  
     vtkSmartPointer<vtkActor> actor = vtkSmartPointer<vtkActor>::New();
     actor->SetMapper(mapper);
@@ -555,7 +574,7 @@ void renderVoxelization(unsigned int* voxels, bool onlySurface, uint3 res)
     data->SetVerts(cells);
 
     vtkSmartPointer<vtkPolyDataMapper> mapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-    mapper->SetInput(data);
+    mapper->SetInputData(data);
 
     vtkSmartPointer<vtkActor> actor = vtkSmartPointer<vtkActor>::New();
     actor->SetMapper(mapper);
@@ -635,7 +654,7 @@ void renderNodeOutput(NT* nodes, bool onlySurface, bool materials, uint3 res)
     data->SetPoints(points);
 
     vtkSmartPointer<vtkVertexGlyphFilter> vertexFilter = vtkSmartPointer<vtkVertexGlyphFilter>::New();
-    vertexFilter->SetInputConnection(data->GetProducerPort());
+    vertexFilter->SetInputData(data);
     vertexFilter->Update();
 
     vtkSmartPointer<vtkPolyData> polydata = vtkSmartPointer<vtkPolyData>::New();
@@ -644,7 +663,7 @@ void renderNodeOutput(NT* nodes, bool onlySurface, bool materials, uint3 res)
     polydata->GetPointData()->SetScalars(colors);
 
     vtkSmartPointer<vtkPolyDataMapper> mapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-    mapper->SetInput(polydata);
+    mapper->SetInputData(polydata);
 
     vtkSmartPointer<vtkActor> actor = vtkSmartPointer<vtkActor>::New();
     actor->SetMapper(mapper);
@@ -1476,7 +1495,7 @@ void renderFCCNodeOutput(NT* nodes, bool onlySurface, bool materials, uint3 res)
     data->SetPoints(points);
 
     vtkSmartPointer<vtkVertexGlyphFilter> vertexFilter = vtkSmartPointer<vtkVertexGlyphFilter>::New();
-    vertexFilter->SetInputConnection(data->GetProducerPort());
+    vertexFilter->SetInputData(data);
     vertexFilter->Update();
 
     vtkSmartPointer<vtkPolyData> polydata = vtkSmartPointer<vtkPolyData>::New();
@@ -1485,7 +1504,7 @@ void renderFCCNodeOutput(NT* nodes, bool onlySurface, bool materials, uint3 res)
     polydata->GetPointData()->SetScalars(colors);
 
     vtkSmartPointer<vtkPolyDataMapper> mapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-    mapper->SetInput(polydata);
+    mapper->SetInputData(polydata);
 
     vtkSmartPointer<vtkActor> actor = vtkSmartPointer<vtkActor>::New();
     actor->SetMapper(mapper);

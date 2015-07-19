@@ -6,6 +6,7 @@ file( GLOB TEST_HEADERS . include/*.h )
 
 link_directories( ${CMAKE_CURRENT_BINARY_DIR}/../lib ) 
 find_package( VTK REQUIRED )
+include(${VTK_USE_FILE})
 
 # Require Boost >= 1.53 with system and thread components.
 find_package( Boost 1.53 REQUIRED COMPONENTS system program_options thread date_time chrono )
