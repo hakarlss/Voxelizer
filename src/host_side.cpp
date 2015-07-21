@@ -471,9 +471,9 @@ void Voxelizer<Node>::allocStaticMem( DevContext<Node> & device )
 
     device.indices_gpu.copyFrom( &this->indices[0] );
 
-    device.tileOverlaps.reserve( this->hostVars.nrOfTriangles );
+    device.tileOverlaps.resize( this->hostVars.nrOfTriangles );
     
-    device.offsetBuffer.reserve( this->hostVars.nrOfTriangles );
+    device.offsetBuffer.resize( this->hostVars.nrOfTriangles );
 }
 ///////////////////////////////////////////////////////////////////////////////
 /// When repeatedly calling \p performVoxelization() in order to consecutively 
