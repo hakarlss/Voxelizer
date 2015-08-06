@@ -23,7 +23,7 @@
 ///
 /// The voxelization produced by the various modes of the program revolves 
 /// around the concept of a voxel center. As long as the center of the voxel 
-/// is inside of the volume defined by a thre dimensional mesh, the voxel is 
+/// is inside of the volume defined by a three dimensional mesh, the voxel is 
 /// considered to be \a solid. This is the case for all voxelizations without 
 /// material data attached to them. If material data is enabled, then the 
 /// surface voxelizer will generate a shell of voxels that abide by a different 

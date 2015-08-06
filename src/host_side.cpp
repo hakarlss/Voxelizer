@@ -47,6 +47,8 @@ template <class Node> Voxelizer<Node>::Voxelizer(
         std::vector<uint>( _indices, _indices + 3*_nrOfTriangles );
 
     this->calculateBoundingBox();
+
+	nrOfDevicesInUse = 0;
 }
 ///////////////////////////////////////////////////////////////////////////////
 /// Constructs the voxelizer as well as supplies material information.
@@ -90,6 +92,8 @@ template <class Node> Voxelizer<Node>::Voxelizer(
         std::vector<uint>( _indices, _indices + 3*_nrOfTriangles );
 
     this->calculateBoundingBox();
+
+	nrOfDevicesInUse = 0;
 
     this->setMaterials( _materials, _nrOfUniqueMaterials );
 }
