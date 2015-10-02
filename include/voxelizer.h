@@ -1071,6 +1071,88 @@ private:
                                               );
 };
 
+///////////////////////////////////////////////////////////////////////////////
+/// Traverses each vertex of the triangle and finds the minimum and maximum
+/// coordinate components and uses them to construct the minimum and maximum
+/// corners of the bounding box.
+/// This version uses \p float3.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ void getTriangleBounds
+    ( float3 const * vertices ///< [in] Vertices of the triangle.
+    , Bounds<float3> & bounds ///< [out] Bounding box of the triangle.
+    )
+{
+    bounds.min = vertices[0];
+    bounds.max = vertices[0];
+
+    // Traverse each vertex and find the smallest / largest coordinates.
+    for (int i = 1; i < 3; i++)
+    {
+        if (vertices[i].x < bounds.min.x)
+            bounds.min.x = vertices[i].x;
+        if (vertices[i].y < bounds.min.y)
+            bounds.min.y = vertices[i].y;
+        if (vertices[i].z < bounds.min.z)
+            bounds.min.z = vertices[i].z;
+
+        if (vertices[i].x > bounds.max.x)
+            bounds.max.x = vertices[i].x;
+        if (vertices[i].y > bounds.max.y)
+            bounds.max.y = vertices[i].y;
+        if (vertices[i].z > bounds.max.z)
+            bounds.max.z = vertices[i].z;
+    }
+
+    return;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+/// The minimum corner is floored and the maximum corner is ceiled.
+/// Expects the triangle's bounding box to be made of \p float3 and returns a
+/// bounding box made of \p uint3.
+///////////////////////////////////////////////////////////////////////////////
+
+// 		!! This one is inside device_code.h !!
+inline __host__ __device__ void getVoxelBounds
+    ( Bounds<float3> const & triBB   ///< [in] Triangle's bounding box.
+    , float3 const & modelBBMin      /**< [in] Minimum corner of the device's
+                                               voxelization space. */
+    , Bounds<uint3> & voxBB          /**< [out] Triangle's bounding
+                                                box in voxel coordinates. */
+    , float d                        ///< [in] Distance between voxel centers.
+    )
+{
+    /* Convert to fractional voxel coordinates, then take their floor for the
+       minimum and ceiling for the maximum coodinates. */
+    voxBB.min = make_uint3( uint( floorf( (triBB.min.x - modelBBMin.x) / d) )
+                          , uint( floorf( (triBB.min.y - modelBBMin.y) / d) )
+                          , uint( floorf( (triBB.min.z - modelBBMin.z) / d) ));
+    voxBB.max = make_uint3( uint( ceilf( (triBB.max.x - modelBBMin.x) / d) )
+                          , uint( ceilf( (triBB.max.y - modelBBMin.y) / d) )
+                          , uint( ceilf( (triBB.max.z - modelBBMin.z) / d) ) );
+    return;
+}
+
+inline __host__ __device__ void getVoxelBounds
+    ( Bounds<double3> const & triBB   ///< [in] Triangle's bounding box.
+    , double3 const & modelBBMin      /**< [in] Minimum corner of the device's
+                                               voxelization space. */
+    , Bounds<uint3> & voxBB          /**< [out] Triangle's bounding
+                                                box in voxel coordinates. */
+    , float d                        ///< [in] Distance between voxel centers.
+    )
+{
+    /* Convert to fractional voxel coordinates, then take their floor for the
+       minimum and ceiling for the maximum coodinates. */
+    voxBB.min = make_uint3( uint( floorf( (triBB.min.x - modelBBMin.x) / d) )
+                          , uint( floorf( (triBB.min.y - modelBBMin.y) / d) )
+                          , uint( floorf( (triBB.min.z - modelBBMin.z) / d) ));
+    voxBB.max = make_uint3( uint( ceilf( (triBB.max.x - modelBBMin.x) / d) )
+                          , uint( ceilf( (triBB.max.y - modelBBMin.y) / d) )
+                          , uint( ceilf( (triBB.max.z - modelBBMin.z) / d) ) );
+    return;
+}
+
 } // End namespace vox
 
 #endif

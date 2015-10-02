@@ -21,6 +21,7 @@
 #include <iostream>
 #include <ctime>
 
+
 #define UINT32_MAX  ((uint32_t)-1)
 #define UINT64_MAX  ((uint64_t)-1)
 
@@ -568,6 +569,136 @@ struct CommonHostData
     uint		  start3DTris;          ///< Index where 3D Triangles start.
     uint		  end3DTris;            ///< Index where 3D Triangles end.
 };
+
+///////////////////////////////////////////////////////////////////////////////
+/// Traverses each vertex of the triangle and finds the minimum and maximum
+/// coordinate components and uses them to construct the minimum and maximum
+/// corners of the bounding box.
+/// This version uses \p double3.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ void getTriangleBounds
+    ( double3 const * vertices ///< [in] Vertices of the triangle.
+    , Bounds<double3> & bounds ///< [out] Bounding box of the triangle.
+    )
+{
+    bounds.min = vertices[0];
+    bounds.max = vertices[0];
+
+    // Traverse each vertex and find the smallest / largest coordinates.
+    for (int i = 1; i < 3; i++)
+    {
+        if (vertices[i].x < bounds.min.x)
+            bounds.min.x = vertices[i].x;
+        if (vertices[i].y < bounds.min.y)
+            bounds.min.y = vertices[i].y;
+        if (vertices[i].z < bounds.min.z)
+            bounds.min.z = vertices[i].z;
+
+        if (vertices[i].x > bounds.max.x)
+            bounds.max.x = vertices[i].x;
+        if (vertices[i].y > bounds.max.y)
+            bounds.max.y = vertices[i].y;
+        if (vertices[i].z > bounds.max.z)
+            bounds.max.z = vertices[i].z;
+    }
+
+    return;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+/// The minimum corner is floored and the maximum corner is ceiled.
+/// Expects the triangle's bounding box to be made of \p double3 and returns a
+/// bounding box made of \p uint3.
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ void getVoxelBounds
+    ( Bounds<double3> const & triBB   ///< [in] Triangle's bounding box.
+    , double3 const & modelBBMin      /**< [in] Minimum corner of the device's
+                                               voxelization space. */
+    , Bounds<uint3> & voxBB          /**< [out] Triangle's bounding
+                                                box in voxel coordinates. */
+    , double d                        ///< [in] Distance between voxel centers.
+    )
+{
+    /* Convert to fractional voxel coordinates, then take their floor for the
+       minimum and ceiling for the maximum coodinates. */
+    voxBB.min = make_uint3( uint( floorf( (triBB.min.x - modelBBMin.x) / d) )
+                          , uint( floorf( (triBB.min.y - modelBBMin.y) / d) )
+                          , uint( floorf( (triBB.min.z - modelBBMin.z) / d) ));
+    voxBB.max = make_uint3( uint( ceilf( (triBB.max.x - modelBBMin.x) / d) )
+                          , uint( ceilf( (triBB.max.y - modelBBMin.y) / d) )
+                          , uint( ceilf( (triBB.max.z - modelBBMin.z) / d) ) );
+    return;
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// Clipping value function.
+/// From: http://stackoverflow.com/questions/9323903/most-efficient-elegant-way-to-clip-a-number
+///////////////////////////////////////////////////////////////////////////////
+template <typename T> __host__ __device__
+T clip(const T& n, const T& lower, const T& upper) {
+  return std::max(lower, std::min(n, upper));
+}
+
+///////////////////////////////////////////////////////////////////////////////
+/// Similar function to getVoxelBounds(), but the bounding boxes are calculated
+/// according to where the triangle resides (without extra voxels that are
+/// outside the triangle's bounding box).
+///////////////////////////////////////////////////////////////////////////////
+inline __host__ __device__ void getVoxelBounds_v2
+    ( Bounds<double3> const & triBB   ///< [in] Triangle's bounding box.
+    , double3 const & modelBBMin      /**< [in] Minimum corner of the device's
+                                               voxelization space. */
+    , Bounds<uint3> & voxBB          /**< [out] Triangle's bounding
+                                                box in voxel coordinates. */
+    , double d                      /**< [in] Distance between voxel centers.*/
+	, Bounds<uint3> const & voxelization_limits ///< [in] The limits of the
+									/// voxelization - the voxel BB will not be
+									/// off this domain.
+    )
+{
+    /* Convert to fractional voxel coordinates, then take their floor for both
+     * the minimum and the maximum. */
+	Bounds<double3> triBB_voxel_space;
+	triBB_voxel_space.min = make_double3( (triBB.min.x - modelBBMin.x) / d,
+										  (triBB.min.y - modelBBMin.y) / d,
+										  (triBB.min.z - modelBBMin.z) / d );
+	triBB_voxel_space.max = make_double3( (triBB.max.x - modelBBMin.x) / d,
+										  (triBB.max.y - modelBBMin.y) / d,
+										  (triBB.max.z - modelBBMin.z) / d );
+
+    voxBB.min = make_uint3( uint( floorf( triBB_voxel_space.min.x ) )
+                          , uint( floorf( triBB_voxel_space.min.y ) )
+                          , uint( floorf( triBB_voxel_space.min.z ) ));
+    voxBB.max = make_uint3( uint( floorf( triBB_voxel_space.max.x ) )
+                          , uint( floorf( triBB_voxel_space.max.y ) )
+                          , uint( floorf( triBB_voxel_space.max.z ) ) );
+    /* Now, if the minimum  touches the voronoi cell surface, then a conserva
+     * tive approach will decrement it. */
+    // Let's use this one... Sound ok-ish for a double precision
+    double epsilon__ = 1e-10;
+    // See http://stackoverflow.com/questions/15313808/how-to-check-if-float-is-a-whole-number
+    if (  fabs(triBB_voxel_space.min.x - round(triBB_voxel_space.min.x)) < epsilon__ ){
+		voxBB.min.x = clip(voxBB.min.x - 1, voxelization_limits.min.x, voxelization_limits.max.x);
+	}
+	if (  fabs(triBB_voxel_space.min.y - round(triBB_voxel_space.min.y)) < epsilon__ ){
+		voxBB.min.y = clip(voxBB.min.y - 1, voxelization_limits.min.y, voxelization_limits.max.y);
+	}
+	if (  fabs(triBB_voxel_space.min.z - round(triBB_voxel_space.min.z)) < epsilon__ ){
+		voxBB.min.z = clip(voxBB.min.z - 1, voxelization_limits.min.z, voxelization_limits.max.z);
+	}
+	/*Similar, for the maximum where the voxel max will be incremented. */
+	if (  fabs(triBB_voxel_space.max.x - round(triBB_voxel_space.max.x)) < epsilon__ ){
+		voxBB.max.x = clip(voxBB.max.x + 1, voxelization_limits.min.x, voxelization_limits.max.x);
+	}
+	if (  fabs(triBB_voxel_space.max.y - round(triBB_voxel_space.max.y)) < epsilon__ ){
+		voxBB.max.y = clip(voxBB.max.y + 1, voxelization_limits.min.y, voxelization_limits.max.y);
+	}
+	if (  fabs(triBB_voxel_space.max.z - round(triBB_voxel_space.max.z)) < epsilon__ ){
+		voxBB.max.z = clip(voxBB.max.z + 1, voxelization_limits.min.z, voxelization_limits.max.z);
+	}
+    return;
+}
 
 } // End namespace vox
 

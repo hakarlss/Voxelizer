@@ -227,6 +227,29 @@ inline __host__ __device__
                        , Bounds<uint3>        & voxBB
                        , float				    d
                        );
+
+// Same function, but working with doubles.
+inline __host__ __device__
+	void getVoxelBounds
+    ( Bounds<double3> const & triBB   ///< [in] Triangle's bounding box.
+    , double3 const & modelBBMin      /**< [in] Minimum corner of the device's
+                                               voxelization space. */
+    , Bounds<uint3> & voxBB          /**< [out] Triangle's bounding
+                                                box in voxel coordinates. */
+    , float d                        ///< [in] Distance between voxel centers.
+    )
+{
+    /* Convert to fractional voxel coordinates, then take their floor for the
+       minimum and ceiling for the maximum coodinates. */
+    voxBB.min = make_uint3( uint( floorf( (triBB.min.x - modelBBMin.x) / d) )
+                          , uint( floorf( (triBB.min.y - modelBBMin.y) / d) )
+                          , uint( floorf( (triBB.min.z - modelBBMin.z) / d) ));
+    voxBB.max = make_uint3( uint( ceilf( (triBB.max.x - modelBBMin.x) / d) )
+                          , uint( ceilf( (triBB.max.y - modelBBMin.y) / d) )
+                          , uint( ceilf( (triBB.max.z - modelBBMin.z) / d) ) );
+    return;
+}
+
 /// Takes a triangle's bounding box and converts it to voxel coordinates.
 inline __host__ __device__
     void getVoxelBoundsDouble( Bounds<double2> const & triBB
