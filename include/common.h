@@ -14,12 +14,13 @@
 #include <limits>
 #include <cuda.h>
 #include <cuda_runtime.h>
-#include <sm_12_atomic_functions.h>
+#include <sm_20_atomic_functions.h>
 
 #include <exception>
 #include <string>
 #include <iostream>
 #include <ctime>
+#include <math.h>
 
 
 #define UINT32_MAX  ((uint32_t)-1)
