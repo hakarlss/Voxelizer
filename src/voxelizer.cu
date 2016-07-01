@@ -6,10 +6,10 @@
 #include <cuda_runtime_api.h>
 #include <device_functions.h>
 #include <device_launch_parameters.h>
-#include <sm_11_atomic_functions.h>
-#include <sm_12_atomic_functions.h>
+//#include <sm_11_atomic_functions.h>
+//#include <sm_12_atomic_functions.h>
 #include <sm_20_atomic_functions.h>
-//#include <sm_35_atomic_functions.h>
+#include <sm_35_atomic_functions.h>
 #include <math_functions.h>
 
 #include <thrust/host_vector.h>
@@ -22,6 +22,7 @@
 
 #include <iostream>
 #include <ctime>
+#include <float.h>
 
 namespace vox {
 
