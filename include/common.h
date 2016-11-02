@@ -22,6 +22,7 @@
 #include <ctime>
 #include <math.h>
 
+#include <algorithm>
 
 #define UINT32_MAX  ((uint32_t)-1)
 #define UINT64_MAX  ((uint64_t)-1)
