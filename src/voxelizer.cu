@@ -19,8 +19,10 @@
 #include <thrust/copy.h>
 #include <thrust/unique.h>
 #include <thrust/count.h>
+#if defined(unix) || defined(__unix__) || defined(__unix)
 #include <thrust/device_malloc.h>
 #include <thrust/device_free.h>
+#endif 
 
 #include <iostream>
 #include <ctime>
