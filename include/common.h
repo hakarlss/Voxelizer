@@ -5,11 +5,7 @@
 #ifndef VOX_COMMON_H
 #define VOX_COMMON_H
 
-#if defined(unix) || defined(__unix__) || defined(__unix)
 #include <stdint.h>
-#else
-#include <stdint.h>
-#endif
 
 #include <limits>
 #include <cuda.h>
