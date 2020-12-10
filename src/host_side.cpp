@@ -47,6 +47,8 @@ template <class Node> Voxelizer<Node>::Voxelizer(
         std::vector<uint>( _indices, _indices + 3*_nrOfTriangles );
 
     this->calculateBoundingBox();
+
+	nrOfDevicesInUse = 0;
 }
 ///////////////////////////////////////////////////////////////////////////////
 /// Constructs the voxelizer as well as supplies material information.
@@ -90,6 +92,8 @@ template <class Node> Voxelizer<Node>::Voxelizer(
         std::vector<uint>( _indices, _indices + 3*_nrOfTriangles );
 
     this->calculateBoundingBox();
+
+	nrOfDevicesInUse = 0;
 
     this->setMaterials( _materials, _nrOfUniqueMaterials );
 }
@@ -471,9 +475,9 @@ void Voxelizer<Node>::allocStaticMem( DevContext<Node> & device )
 
     device.indices_gpu.copyFrom( &this->indices[0] );
 
-    device.tileOverlaps.reserve( this->hostVars.nrOfTriangles );
+    device.tileOverlaps.resize( this->hostVars.nrOfTriangles );
     
-    device.offsetBuffer.reserve( this->hostVars.nrOfTriangles );
+    device.offsetBuffer.resize( this->hostVars.nrOfTriangles );
 }
 ///////////////////////////////////////////////////////////////////////////////
 /// When repeatedly calling \p performVoxelization() in order to consecutively 
@@ -581,6 +585,8 @@ std::vector<NodePointer<Node> >  Voxelizer<Node>::voxelize( uint  maxDimension,
 
     result = this->collectData();
 
+    this->deallocate();
+
     // Return the pointer to the voxel data.
     return result;
 }
@@ -636,6 +642,8 @@ std::vector<NodePointer<Node> >  Voxelizer<Node>::voxelize( double cubeLength,
                        , NULL );
 
     result = this->collectData();
+
+    this->deallocate();
 
     // Return the pointer to the voxel data.
     return result;
@@ -1746,6 +1754,8 @@ std::vector<NodePointer<Node> > Voxelizer<Node>::voxelizeToNodes(
 
     result = this->collectData();
 
+    this->deallocate();
+
     return result;
 }
 ///////////////////////////////////////////////////////////////////////////////
@@ -1798,6 +1808,8 @@ std::vector<NodePointer<Node> > Voxelizer<Node>::voxelizeToNodes(
 
     result = this->collectData();
 
+    this->deallocate();
+
     return result;
 }
 ///////////////////////////////////////////////////////////////////////////////
@@ -1835,6 +1847,8 @@ NodePointer<Node> Voxelizer<Node>::voxelizeToNodesToRAM(
 
     result = this->collectData( this->devices[0], true );
 
+    this->deallocate();
+
     return result;
 }
 ///////////////////////////////////////////////////////////////////////////////
@@ -1865,6 +1879,8 @@ NodePointer<Node> Voxelizer<Node>::voxelizeToNodesToRAM(
     this->voxelizeEntry( make_uint2( 1 ), voxSplitRes, matSplitRes, NULL );
 
     result = this->collectData( this->devices[0], true );
+
+    this->deallocate();
 
     return result;
 }
@@ -2277,6 +2293,8 @@ NodePointer<Node> Voxelizer<Node>::voxelizeToRAM( uint  maxDimension,
 
     result = this->collectData( this->devices[0], true );
 
+    this->deallocate();
+
     return result;
 }
 ///////////////////////////////////////////////////////////////////////////////
@@ -2312,6 +2330,8 @@ NodePointer<Node> Voxelizer<Node>::voxelizeToRAM( double cubeLength,
         , NULL );
 
     result = this->collectData( this->devices[0], true );
+
+    this->deallocate();
 
     return result;
 }
