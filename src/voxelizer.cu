@@ -19,6 +19,8 @@
 #include <thrust/copy.h>
 #include <thrust/unique.h>
 #include <thrust/count.h>
+#include <thrust/device_malloc.h>
+#include <thrust/device_free.h>
 
 #include <iostream>
 #include <ctime>
